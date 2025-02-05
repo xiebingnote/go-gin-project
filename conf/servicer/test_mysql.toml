@@ -1,0 +1,37 @@
+# Service的名字，必选
+Name = "test_mysql"
+
+## 各种自定义的参数，会以 Option 的方式放到 Servicer 中，全部非必选
+# 连接超时
+ConnTimeOut = 300
+# 写数据超时
+WriteTimeOut = 2000
+# 读数据超时
+ReadTimeOut = 2000
+# 请求失败后的重试次数：总请求次数 = Retry + 1
+Retry = 2
+
+# 资源使用策略，非必选，默认使用 RoundRobin
+# RoundRobin: 依次轮询
+# Random 随机
+[Strategy]
+Name = "Random"
+# 资源定位配置必须有且只有一项
+# 资源定位：使用 BNS
+[Resource.Manual]
+[[Resource.Manual.default]]
+Host = "127.0.0.1"
+Port = 3306
+
+[MySQL]
+Username = "root"
+Password = "123456"
+DBName = "test"
+DBDriver = "mysql"
+MaxOpenPerIP = 5
+MaxIdlePerIP = 5
+ConnMaxLifeTime = 5000 # 单位 ms
+SQLLogLen = -1    # 打印sql内容，为0不打印，-1 为全部
+SQLArgsLogLen = -1    # 打印sql参数内容，为0不打印，-1 为全部
+LogIDTransport = true # 是否sql注释传递logid
+DSNParams = "charset=utf8&timeout=90s&collation=utf8mb4_unicode_ci&parseTime=true&loc=Asia%2FShanghai"
