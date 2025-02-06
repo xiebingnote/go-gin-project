@@ -3,7 +3,7 @@
 # HTTPServer 的配置
 [HTTPServer]
 # 端口 port.Main 定义在 app.toml
-Listen = "tcp@0.0.0.0:{port.Main}"
+Listen = "0.0.0.0:8080"
 
 # 读 Header + Body 超时时间，ms，可选配置，若不配置，或者为0，将不超时
 # 建议：内网API服务可以小一些；外网页面可大一些，避免弱网访问失败
@@ -30,4 +30,4 @@ IdleTimeout = 3000
 [AdminServer]
 # 监听一个独立的端口
 # 端口 port.Admin 定义在 app.toml
-Listen = "tcp@0.0.0.0:{port.Admin}"
+Listen = "0.0.0.0:8081"

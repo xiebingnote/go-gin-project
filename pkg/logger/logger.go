@@ -21,193 +21,275 @@ type Option func(o *option)
 type option struct {
 	level          zapcore.Level
 	fields         map[string]string
-	file           io.Writer
 	timeLayout     string
 	disableConsole bool
+	logDir         string
 }
 
-// WithDebugLevel returns an Option that sets the logger level to zapcore.DebugLevel
+// WithDebugLevel returns an Option that sets the logging level to
+// zapcore.DebugLevel.
+//
+// DebugLevel is used to log detailed information, typically of interest
+// only when diagnosing problems.
+//
+// Example:
+//
+//	 logger, err := logger.NewJsonLogger(
+//			logger.WithDebugLevel(),
+//		)
+//
+// This will log all messages with a level of Debug and above.
 func WithDebugLevel() Option {
 	return func(opt *option) {
 		opt.level = zapcore.DebugLevel
 	}
 }
 
-// WithWarnLevel returns an Option that sets the logger level to zapcore.WarnLevel.
-// Logging events at or above this level will be emitted.
+// WithWarnLevel returns an Option that sets the logging level to
+// zapcore.WarnLevel.
+//
+// WarnLevel is a level that is used when an event has occurred that may
+// potentially cause a problem.
+//
+// Example:
+//
+//	 logger, err := logger.NewJsonLogger(
+//			logger.WithWarnLevel(),
+//		)
 func WithWarnLevel() Option {
 	return func(opt *option) {
 		opt.level = zapcore.WarnLevel
 	}
 }
 
-// WithErrorLevel returns an Option that sets the logger level to zapcore.ErrorLevel.
-// Logging events at or above this level will be emitted.
+// WithErrorLevel returns an Option that sets the logging level to
+// zapcore.ErrorLevel.
+//
+// ErrorLevel is a level that is used when an error has occurred.
+//
+// Example:
+//
+//	 logger, err := logger.NewJsonLogger(
+//			logger.WithErrorLevel(),
+//		)
 func WithErrorLevel() Option {
 	return func(opt *option) {
 		opt.level = zapcore.ErrorLevel
 	}
 }
 
-// WithFiled returns an Option that sets the logger fields to the given key-value pair.
-// The field key will be used as the key in the zapcore.Field, and the field val will be used as the value.
-// If the key is empty, the Option is a no-op.
-func WithFiled(key, val string) Option {
+// WithField returns an Option that sets a field to the logger.
+//
+// The key argument specifies the key of the field, and the val argument
+// specifies the value of the field.
+//
+// If the key is already present in the logger, the value will be
+// overwritten.
+//
+// Example:
+//
+//	 logger, err := logger.NewJsonLogger(
+//			logger.WithField("service", "myapp"),
+//		)
+func WithField(key, val string) Option {
 	return func(opt *option) {
+		if opt.fields == nil {
+			opt.fields = make(map[string]string)
+		}
 		opt.fields[key] = val
 	}
 }
 
-// WithFileP returns an Option that sets the logger output to a specified file.
-// It ensures that the directory structure for the file path exists, creating directories as needed.
-// The file is opened with append and read/write permissions. If any error occurs during directory creation
-// or file opening, the function will panic.
-//
-// The file path can be either an absolute path or a relative path. If the path is relative, it is
-// resolved relative to the current working directory.
-func WithFileP(file string) Option {
-	// Ensure the directory structure exists
-	dir := filepath.Dir(file)
-	if err := os.MkdirAll(dir, 0766); err != nil {
-		panic(err)
-	}
-
-	// Open the file with append and read/write permissions
-	f, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0766)
-	if err != nil {
-		panic(err)
-	}
-
-	// Return an Option that sets the logger output to the file
-	return func(opt *option) {
-		opt.file = f
-	}
-}
-
-// WithFileRelationP returns an Option that sets the logger output to a lumberjack.Logger.
-//
-// The lumberjack.Logger is a rolling logger that rotates files based on size and age.
-// The file path can be either an absolute path or a relative path. If the path is relative, it is
-// resolved relative to the current working directory.
-//
-// The MaxSize, MaxBackups, and MaxAge fields of the lumberjack.Logger are set to 128M, 300, and 30 days,
-// respectively. LocalTime is set to true, and Compress is set to true.
-//
-// If any error occurs during directory creation or file opening, the function will panic.
-func WithFileRelationP(file string) Option {
-	// Ensure the directory structure exists
-	dir := filepath.Dir(file)
-	if err := os.MkdirAll(dir, 0766); err != nil {
-		panic(err)
-	}
-
-	// Return an Option that sets the logger output to a lumberjack.Logger
-	return func(opt *option) {
-		opt.file = &lumberjack.Logger{
-			Filename:   file, // 文件路径
-			MaxSize:    128,  // 单个文件最大尺寸，默认单位 M
-			MaxBackups: 300,  // 最多保留 300 个备份
-			MaxAge:     30,   // 最大时间，默认单位 day
-			LocalTime:  true, // 使用本地时间
-			Compress:   true, // 是否压缩 disabled by default
-		}
-	}
-}
-
 // WithTimeLayout returns an Option that sets the time layout for the logger.
-// The timeLayout parameter specifies the format in which timestamps will be
-// logged. It should be a valid Go time format string. If the provided timeLayout
-// is empty or invalid, the default time layout will be used.
+//
+// The time layout is used to format the time field in the log messages.
+// The time layout must be a valid time layout string as specified in the
+// time package.
+//
+// Example:
+//
+//	 logger, err := logger.NewJsonLogger(
+//			logger.WithTimeLayout("2006-01-02 15:04:05"),
+//		)
 func WithTimeLayout(timeLayout string) Option {
 	return func(opt *option) {
 		opt.timeLayout = timeLayout
 	}
 }
 
-// WithDisableConsole returns an Option that sets the logger to disable console output.
-// It is used to disable console output when the logger is used in a server environment.
+// WithDisableConsole returns an Option that disables console logging.
+//
+// When this option is applied, log messages will not be printed to the console,
+// but will still be written to the configured log files.
+//
+// Example:
+//
+//	 logger, err := logger.NewJsonLogger(
+//			logger.WithDisableConsole(),
+//		)
 func WithDisableConsole() Option {
 	return func(opt *option) {
+		// Set the disableConsole flag to true to disable console logging.
 		opt.disableConsole = true
 	}
 }
 
-// NewJsonLogger creates a new JSON-formatted zap.Logger with the provided options.
-// It configures the logger's level, fields, output file, time layout, and console output
-// settings based on the given Option functions. By default, it logs to both stdout and stderr,
-// but console output can be disabled using the WithDisableConsole option.
-// The logger supports optional fields, which can be set with WithFiled.
-// If a file is provided with WithFileP or WithFileRelationP, logs are additionally written to that file.
-// The function returns the configured zap.Logger or an error if the configuration fails.
+// WithLogDir returns an Option that sets the log directory for the logger.
+//
+// The logDir argument specifies the log directory. If the logDir is empty,
+// the logger will not write log messages to files.
+//
+// Example:
+//
+//	 logger, err := logger.NewJsonLogger(
+//			logger.WithLogDir("/var/log"),
+//		)
+func WithLogDir(logDir string) Option {
+	return func(opt *option) {
+		opt.logDir = logDir
+	}
+}
+
+// NewJsonLogger creates a new JSON logger with the given options.
+//
+// The options argument is a variadic list of Option functions that customize
+// the logger. The available options are:
+//
+//   - WithLevel: sets the log level to the specified level.
+//   - WithFields: sets the log fields to the specified values.
+//   - WithTimeLayout: sets the time layout to the specified format.
+//   - WithDisableConsole: disables console logging.
+//   - WithLogDir: sets the log directory to the specified path.
 func NewJsonLogger(opts ...Option) (*zap.Logger, error) {
 	opt := &option{
 		level:  DefaultLevel,
 		fields: make(map[string]string),
+		logDir: "./log",
 	}
 
 	for _, f := range opts {
 		f(opt)
 	}
+
 	timeLayout := DefaultTimeLayout
 	if opt.timeLayout != "" {
 		timeLayout = opt.timeLayout
 	}
 
-	// Configure the JSON encoder
 	encoderConfig := zapcore.EncoderConfig{
 		TimeKey:       "time",
 		LevelKey:      "level",
-		NameKey:       "logger", // used by logger.Named(key); optional; useless
+		NameKey:       "logger",
 		CallerKey:     "caller",
 		MessageKey:    "msg",
-		StacktraceKey: "stacktrace", // use by zap.AddStacktrace; optional; useless
+		StacktraceKey: "stacktrace",
 		LineEnding:    zapcore.DefaultLineEnding,
-		EncodeLevel:   zapcore.LowercaseLevelEncoder, // 小写编码器
+		EncodeLevel:   zapcore.LowercaseLevelEncoder,
 		EncodeTime: func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 			enc.AppendString(t.Format(timeLayout))
 		},
 		EncodeDuration: zapcore.MillisDurationEncoder,
-		EncodeCaller:   zapcore.ShortCallerEncoder, // 全路径编码器
+		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 
 	jsonEncoder := zapcore.NewJSONEncoder(encoderConfig)
 
-	// Configure the low-priority and high-priority writers
-	lowPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-		return lvl >= opt.level && lvl < zapcore.ErrorLevel
-	})
+	if err := os.MkdirAll(opt.logDir, 0766); err != nil {
+		return nil, err
+	}
 
-	highPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-		return lvl >= opt.level && lvl >= zapcore.ErrorLevel
-	})
+	debugWriter := newLogWriter(filepath.Join(opt.logDir, "debug.log"))
+	infoWriter := newLogWriter(filepath.Join(opt.logDir, "info.log"))
+	warnWriter := newLogWriter(filepath.Join(opt.logDir, "warn.log"))
+	errorWriter := newLogWriter(filepath.Join(opt.logDir, "error.log"))
 
-	stdout := zapcore.Lock(os.Stdout)
-	stderr := zapcore.Lock(os.Stderr)
-	core := zapcore.NewTee()
+	// Create the debug core
+	debugCore := zapcore.NewCore(
+		jsonEncoder,
+		zapcore.AddSync(debugWriter),
+		zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+			return lvl == zapcore.DebugLevel
+		}),
+	)
+
+	// Create the info core
+	infoCore := zapcore.NewCore(
+		jsonEncoder,
+		zapcore.AddSync(infoWriter),
+		zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+			return lvl == zapcore.InfoLevel
+		}),
+	)
+
+	// Create the warn core
+	warnCore := zapcore.NewCore(
+		jsonEncoder,
+		zapcore.AddSync(warnWriter),
+		zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+			return lvl == zapcore.WarnLevel
+		}),
+	)
+
+	// Create the error core
+	errorCore := zapcore.NewCore(
+		jsonEncoder,
+		zapcore.AddSync(errorWriter),
+		zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+			return lvl >= zapcore.ErrorLevel
+		}),
+	)
+
+	// Create the tee core
+	core := zapcore.NewTee(debugCore, infoCore, warnCore, errorCore)
 
 	if !opt.disableConsole {
-		// Add the console output streams
-		core = zapcore.NewTee(
-			zapcore.NewCore(jsonEncoder, zapcore.NewMultiWriteSyncer(stdout), lowPriority),
-			zapcore.NewCore(jsonEncoder, zapcore.NewMultiWriteSyncer(stderr), highPriority),
-		)
-	}
-	if opt.file != nil {
-		// Add the file output stream
+		// Create stdout and stderr writers
+		stdout := zapcore.Lock(os.Stdout)
+		stderr := zapcore.Lock(os.Stderr)
+
+		// Add the stdout and stderr writers to the tee core
 		core = zapcore.NewTee(core,
-			zapcore.NewCore(jsonEncoder, zapcore.AddSync(opt.file), zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-				return lvl >= opt.level
-			}),
-			),
+			zapcore.NewCore(jsonEncoder, zapcore.NewMultiWriteSyncer(stdout), zapcore.InfoLevel),
+			zapcore.NewCore(jsonEncoder, zapcore.NewMultiWriteSyncer(stderr), zapcore.ErrorLevel),
 		)
 	}
 
-	logger := zap.New(core, zap.AddCaller(), zap.ErrorOutput(stderr))
+	// Create the logger
+	logger := zap.New(core, zap.AddCaller(), zap.ErrorOutput(zapcore.AddSync(errorWriter)))
 
-	// Add the optional fields
+	// Add the fields to the logger
 	for k, v := range opt.fields {
 		logger = logger.WithOptions(zap.Fields(zapcore.Field{Key: k, Type: zapcore.StringType, String: v}))
 	}
 
 	return logger, nil
+}
+
+// newLogWriter creates a new log writer that writes to a file.
+// It returns a lumberjack.Logger that implements the io.Writer interface.
+// The logger will write to the file specified by the file parameter and
+// will rotate the file when it reaches the maximum size specified by the
+// MaxSize parameter. The logger will also keep a maximum of 300 backups
+// and will delete any backups older than 30 days.
+func newLogWriter(file string) io.Writer {
+	return &lumberjack.Logger{
+		Filename:   file, // 文件路径
+		MaxSize:    128,  // 单个文件最大尺寸，默认单位 M
+		MaxBackups: 300,  // 最多保留 300 个备份
+		MaxAge:     30,   // 最大时间，默认单位 day
+		LocalTime:  true, // 使用本地时间
+		Compress:   true, // 是否压缩
+	}
+}
+
+// Close gracefully closes the provided zap.Logger.
+// It ensures that all buffered log entries are written out before returning.
+// If the logger is nil, it returns immediately without an error.
+func Close(logger *zap.Logger) error {
+	if logger == nil {
+		// No logger to close, return immediately.
+		return nil
+	}
+	// Sync the logger to flush all buffered log entries.
+	return logger.Sync()
 }

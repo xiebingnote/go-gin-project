@@ -33,131 +33,227 @@ const (
 
 type TimeType int
 
+// init initializes the now package with a custom week start day.
 func init() {
+	// Set the week start day to Monday.
 	now.WeekStartDay = time.Monday
 }
 
+// Ntime returns the current time in Unix timestamp format.
 func Ntime() int64 {
 	return time.Now().Unix()
 }
 
+// Ts2Time converts a Unix timestamp in seconds to a time.Time object.
 func Ts2Time(ts int64) time.Time {
 	return time.Unix(ts, 0)
 }
 
+// Ns2Time converts a Unix nanosecond timestamp to a time.Time object.
 func Ns2Time(ns int64) time.Time {
 	return time.Unix(0, ns)
 }
 
+// GetLastMonthTimeRange returns the time range for the last month.
+//
+// The time range is returned as a tuple of two time.Time objects, where the
+// first element is the start of the last month, and the second element is the
+// end of the last month.
+//
+// The time range is inclusive, meaning that the start and end times are
+// included in the range.
 func GetLastMonthTimeRange() (time.Time, time.Time) {
 	return now.BeginningOfMonth().AddDate(0, -1, 0), now.EndOfMonth().AddDate(0, -1, 0)
 }
 
+// GetLastWeekTimeRange returns the time range for the last week.
+//
+// The time range is returned as a tuple of two time.Time objects, where the
+// first element is the start of the last week, and the second element is the
+// end of the last week.
+//
+// The time range is inclusive, meaning that the start and end times are
+// included in the range.
 func GetLastWeekTimeRange() (time.Time, time.Time) {
 	return now.BeginningOfWeek().AddDate(0, 0, -7), now.EndOfWeek().AddDate(0, 0, -7)
 }
 
+// GetYesterdayTimeRange returns the time range for yesterday.
+//
+// The time range is returned as a tuple of two time.Time objects, where the
+// first element is the start of yesterday, and the second element is the
+// end of yesterday.
+//
+// The time range is inclusive, meaning that the start and end times are
+// included in the range.
 func GetYesterdayTimeRange() (time.Time, time.Time) {
 	return now.BeginningOfDay().AddDate(0, 0, -1), now.EndOfDay().AddDate(0, 0, -1)
 }
 
+// GetBeforeYesterdayTimeRange returns the time range for the day before yesterday.
+//
+// The time range is returned as a tuple of two time.Time objects, where the
+// first element is the start of the day before yesterday, and the second
+// element is the end of the day before yesterday.
+//
+// The time range is inclusive, meaning that the start and end times are
+// included in the range.
 func GetBeforeYesterdayTimeRange() (time.Time, time.Time) {
 	return now.BeginningOfDay().AddDate(0, 0, -2), now.EndOfDay().AddDate(0, 0, -2)
 }
 
+// GetBeforeLastWeekTimeRange returns the time range for the week before last week.
+//
+// The time range is returned as a tuple of two time.Time objects, where the
+// first element is the start of the week before last week, and the second
+// element is the end of the week before last week.
+//
+// The time range is inclusive, meaning that the start and end times are
+// included in the range.
 func GetBeforeLastWeekTimeRange() (time.Time, time.Time) {
 	return now.BeginningOfWeek().AddDate(0, 0, -14), now.EndOfWeek().AddDate(0, 0, -14)
 }
 
+// GetBeforeLastMonthTimeRange returns the time range for the month before last month.
+//
+// The time range is returned as a tuple of two time.Time objects, where the
+// first element is the start of the month before last month, and the second
+// element is the end of the month before last month.
+//
+// The time range is inclusive, meaning that the start and end times are
+// included in the range.
 func GetBeforeLastMonthTimeRange() (time.Time, time.Time) {
 	return now.BeginningOfMonth().AddDate(0, -2, 0), now.EndOfMonth().AddDate(0, -2, 0)
 }
 
+// String returns the string representation of the TimeType.
+//
+// This method converts the TimeType enumeration value into a human-readable
+// string format. If the TimeType is not recognized, it returns an empty string.
 func (t TimeType) String() string {
 	switch t {
 	case TimeTypeDay:
+		// Represents a day time type
 		return "day"
 	case TimeTypeWeek:
+		// Represents a week time type
 		return "week"
 	case TimeTypeMonth:
+		// Represents a month time type
 		return "month"
 	case TimeTypeHour:
+		// Represents an hour time type
 		return "hour"
 	case TimeType6Hour:
+		// Represents a 6-hour time type
 		return "6hour"
 	case TimeType12Hour:
+		// Represents a 12-hour time type
 		return "12hour"
 	default:
+		// Default case for unrecognized time types
 		return ""
 	}
 }
 
+// GetTimeByTimeType returns the start and end times for the given time type.
+//
+// The start time is the beginning of the time range for the given time type,
+// and the end time is the end of the time range for the given time type. If
+// the time type is not recognized, it returns an error.
 func GetTimeByTimeType(timeType TimeType) (time.Time, time.Time, error) {
 	var start, end time.Time
 	switch timeType {
 	case TimeTypeDay:
+		// For the day time type, the start time is 23 hours ago
 		start = time.Now().Add(-23 * time.Hour)
 	case TimeTypeWeek:
+		// For the week time type, the start time is 6 days ago
 		start = time.Now().AddDate(0, 0, -6)
 	case TimeTypeMonth:
+		// For the month time type, the start time is 29 days ago
 		start = time.Now().AddDate(0, 0, -29)
 	case TimeTypeHour:
+		// For the hour time type, the start time is 50 minutes ago
 		start = time.Now().Add(-50 * time.Minute)
 	case TimeType6Hour:
+		// For the 6-hour time type, the start time is 5 hours ago
 		start = time.Now().Add(-5 * time.Hour)
 	case TimeType12Hour:
+		// For the 12-hour time type, the start time is 11 hours ago
 		start = time.Now().Add(-11 * time.Hour)
 	default:
+		// Default case for unrecognized time types
 		return time.Time{}, time.Time{}, errors.New("invalid time type")
 	}
+	// The end time is always the end of the day
 	end = now.EndOfDay()
 	return start, end, nil
 }
 
+// GetTimeRangeSliceByTimeType returns a slice of time.Time objects for the given time type.
+//
+// The slice of time.Time objects represents the time range for the given time type.
+// The time range is inclusive, meaning that the start and end times are included in the range.
+// The time range is sorted in ascending order.
 func GetTimeRangeSliceByTimeType(timeType TimeType) ([]time.Time, error) {
 	var timeSlice []time.Time
 
 	switch timeType {
 	case TimeTypeDay: // 过去一天，每小时一个
+		// Create a slice of 24 time.Time objects, each representing a different hour of the past day.
 		timeSlice = make([]time.Time, 24)
 		nowHour := now.BeginningOfHour()
 		for i := 0; i < 24; i++ {
+			// For each hour, subtract the current hour from the current time to get the time for that hour.
 			timeSlice[i] = nowHour.Add(-time.Duration(i) * time.Hour)
 		}
 	case TimeTypeWeek: // 过去一周，每天
+		// Create a slice of 7 time.Time objects, each representing a different day of the past week.
 		timeSlice = make([]time.Time, 7)
 		nowDay := now.BeginningOfDay()
 		for i := 0; i < 7; i++ {
+			// For each day, subtract the current day from the current time to get the time for that day.
 			timeSlice[i] = nowDay.AddDate(0, 0, -i)
 		}
 	case TimeTypeMonth: // 过去一个月，每天
+		// Create a slice of 30 time.Time objects, each representing a different day of the past month.
 		timeSlice = make([]time.Time, 30)
 		nowDay := now.BeginningOfDay()
 		for i := 0; i < 30; i++ {
+			// For each day, subtract the current day from the current time to get the time for that day.
 			timeSlice[i] = nowDay.AddDate(0, 0, -i)
 		}
 	case TimeTypeHour: // 过去一小时，每10分钟
+		// Create a slice of 6 time.Time objects, each representing a different minute of the past hour.
 		timeSlice = make([]time.Time, 6)
 		nowMin := now.BeginningOfMinute()
 		for i := 0; i < 6; i++ {
+			// For each minute, subtract the current minute from the current time to get the time for that minute.
 			timeSlice[i] = nowMin.Add(-time.Duration(i*10) * time.Minute)
 		}
 	case TimeType6Hour: // 过去6小时，每小时
+		// Create a slice of 6 time.Time objects, each representing a different hour of the past 6 hours.
 		timeSlice = make([]time.Time, 6)
 		nowHour := now.BeginningOfHour()
 		for i := 0; i < 6; i++ {
+			// For each hour, subtract the current hour from the current time to get the time for that hour.
 			timeSlice[i] = nowHour.Add(-time.Duration(i) * time.Hour)
 		}
 	case TimeType12Hour: // 过去12小时，每小时
+		// Create a slice of 12 time.Time objects, each representing a different hour of the past 12 hours.
 		timeSlice = make([]time.Time, 12)
 		nowHour := now.BeginningOfHour()
 		for i := 0; i < 12; i++ {
+			// For each hour, subtract the current hour from the current time to get the time for that hour.
 			timeSlice[i] = nowHour.Add(-time.Duration(i) * time.Hour)
 		}
 	default:
+		// Default case for unrecognized time types
 		return nil, errors.New("unsupported time type")
 	}
 
+	// Sort the slice of time.Time objects in ascending order.
 	sort.Slice(timeSlice, func(i, j int) bool {
 		return timeSlice[i].Before(timeSlice[j])
 	})
@@ -165,25 +261,34 @@ func GetTimeRangeSliceByTimeType(timeType TimeType) ([]time.Time, error) {
 	return timeSlice, nil
 }
 
-// GetPgInterval 时间间隔
+// GetPgInterval returns the PostgreSQL interval for the given time type.
 func GetPgInterval(timeType TimeType) (string, error) {
+	// The PostgreSQL interval is used to specify the time range for a query.
+	// The interval is determined by the time type.
 	var interval string
 	switch timeType {
 	case TimeTypeDay:
+		// For TimeTypeDay, the interval is 'hour'.
 		interval = "hour"
 	case TimeTypeWeek:
 		fallthrough
 	case TimeTypeMonth:
+		// For TimeTypeWeek and TimeTypeMonth, the interval is 'day'.
 		interval = "day"
 	case TimeTypeHour:
+		// For TimeTypeHour, the interval is 'minute'.
 		interval = "minute"
 	case TimeType6Hour:
+		// For TimeType6Hour, the interval is 'hour'.
 		interval = "hour"
 	case TimeType12Hour:
+		// For TimeType12Hour, the interval is 'hour'.
 		interval = "hour"
 	default:
+		// If the time type is not recognized, return an error.
 		return "", fmt.Errorf("invalid time type")
 	}
+	// Return the PostgreSQL interval.
 	return interval, nil
 }
 

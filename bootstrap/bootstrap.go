@@ -2,8 +2,11 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	pkglogger "project/pkg/logger"
 	"time"
 
 	"project/library/config"
@@ -12,7 +15,9 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/olivere/elastic/v7"
-	"go.uber.org/zap"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // MustInit initializes the necessary components of the application.
@@ -36,7 +41,7 @@ func MustInit(ctx context.Context) {
 
 	initRedis(ctx)
 
-	//initES(ctx)
+	initES(ctx)
 
 	initCron()
 
@@ -55,7 +60,18 @@ func hookStd() {
 // for high-performance and structured logging in production environments.
 // The function takes a context.Context parameter, but does not currently use it.
 func initLogger(ctx context.Context) {
-	resource.LoggerService, _ = zap.NewProduction()
+	var err error
+	resource.LoggerService, err = pkglogger.NewJsonLogger(
+		pkglogger.WithField("app", "project"),   // 添加全局字段
+		pkglogger.WithField("version", "1.0.0"), // 添加全局字段
+		pkglogger.WithDebugLevel(),              // 设置日志级别为 Debug
+		pkglogger.WithLogDir("./log"),           // 设置日志目录
+
+	)
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+
 }
 
 // initConfig initializes the configuration.
@@ -63,6 +79,10 @@ func initLogger(ctx context.Context) {
 // This function is currently a no-op, but can be used in the future to initialize
 // the configuration from a file or other source.
 func initConfig() {
+	if _, err := toml.DecodeFile("/Users/Mac/GolandProjects/project/conf/server.toml", &config.ServerConfig); err != nil {
+		// Panic with the error message if decoding fails.
+		panic(err.Error())
+	}
 
 }
 
@@ -71,7 +91,68 @@ func initConfig() {
 // This function is currently a no-op, but can be used in the future to initialize
 // the MySQL database connection from a file or other source.
 func initMySQL(_ context.Context) {
+	if _, err := toml.DecodeFile("/Users/Mac/GolandProjects/project/conf/servicer/test_mysql.toml", &config.MySQLConfig); err != nil {
+		// Panic with the error message if decoding fails.
+		panic(err.Error())
+	}
 
+	err := InitMySQL()
+	if err != nil {
+		panic(err.Error())
+	}
+}
+
+func InitMySQL() error {
+	cfg := config.MySQLConfig
+
+	// 构建 DSN
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?%s",
+		cfg.MySQL.Username,
+		cfg.MySQL.Password,
+		cfg.Resource.Manual.Default[0].Host,
+		cfg.Resource.Manual.Default[0].Port,
+		cfg.MySQL.DBName,
+		cfg.MySQL.DSNParams,
+	)
+
+	// 初始化 GORM
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger: newGormLogger(cfg),
+	})
+	if err != nil {
+		return fmt.Errorf("gorm open failed: %w", err)
+	}
+
+	// 获取通用数据库对象以设置连接池
+	sqlDB, err := db.DB()
+	if err != nil {
+		return fmt.Errorf("get sql.DB failed: %w", err)
+	}
+
+	// 设置连接池参数
+	sqlDB.SetMaxOpenConns(cfg.MySQL.MaxOpenPerIP)
+	sqlDB.SetMaxIdleConns(cfg.MySQL.MaxIdlePerIP)
+	sqlDB.SetConnMaxLifetime(time.Duration(cfg.MySQL.ConnMaxLifeTime) * time.Millisecond)
+
+	resource.MySQLClient = db
+	return nil
+}
+
+func newGormLogger(cfg *config.MySQLConfigEntry) logger.Interface {
+	logLevel := logger.Silent
+	if cfg.MySQL.SQLLogLen != 0 || cfg.MySQL.SQLArgsLogLen != 0 {
+		logLevel = logger.Info
+	}
+
+	return logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags), // 使用标准库日志
+		logger.Config{
+			SlowThreshold:             time.Second, // 慢查询阈值
+			LogLevel:                  logLevel,    // 日志级别
+			IgnoreRecordNotFoundError: true,        // 忽略记录未找到错误
+			Colorful:                  false,       // 禁用彩色打印
+		},
+	)
 }
 
 // initRedis initializes the Redis database connection.
@@ -178,59 +259,66 @@ func InitESClient() *elastic.Client {
 	return client
 }
 
-// Close releases all resources held by the application.
-//
-// It performs the following actions in sequence:
-// - Syncs the logger to ensure all buffered logs are written.
-// - Closes the MySQL and Redis clients to release their connections.
-// - Stops the Elasticsearch client to terminate any ongoing operations.
-// - Stops all scheduled cron jobs to prevent further execution.
-//
-// If any errors occur during the cleanup process, it returns a combined error
-// representing all the individual errors encountered. If no errors occur, it
-// returns nil.
 func Close() error {
-	//var errs []error
-	//
+	var errs []error
+
 	//// Wait for the logger to sync all the buffered logs.
 	//if resource.LoggerService != nil {
 	//	if err := resource.LoggerService.Sync(); err != nil {
 	//		errs = append(errs, fmt.Errorf("failed to sync logger: %w", err))
 	//	}
 	//}
-	//
-	//// Close the MySQL client.
-	//if resource.MySQLClient != nil {
-	//	if err := resource.MySQLClient.Close(); err != nil {
-	//		errs = append(errs, fmt.Errorf("failed to close MySQL client: %w", err))
-	//	}
-	//}
-	//
+
+	if resource.LoggerService != nil {
+		if err := pkglogger.Close(resource.LoggerService); err != nil {
+			errs = append(errs, fmt.Errorf("failed to close logger: %w", err))
+		}
+	}
+
+	// Close the MySQL client.
+	if resource.MySQLClient != nil {
+		sqlDB, _ := resource.MySQLClient.DB()
+		err := sqlDB.Close()
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to close MySQL client: %w", err))
+		}
+	}
+
 	//// Close the Redis client.
 	//if resource.RedisClient != nil {
 	//	if err := resource.RedisClient.Close(); err != nil {
 	//		errs = append(errs, fmt.Errorf("failed to close Redis client: %w", err))
 	//	}
 	//}
-	//
-	//// Stop the ES client.
-	//if resource.ESClient != nil {
-	//	resource.ESClient.Stop()
-	//}
-	//
-	//// Stop all the cron jobs.
-	//if resource.Corn != nil {
-	//	resource.Corn.StopJobs()
-	//}
-	//
-	//// If any error occurred during the resource cleanup, return the combined error.
-	//if len(errs) > 0 {
-	//	var combinedErr error
-	//	for _, err := range errs {
-	//		combinedErr = fmt.Errorf("%v; %w", combinedErr, err)
-	//	}
-	//	return combinedErr
-	//}
 
+	// Stop the ES client.
+	if resource.ESClient != nil {
+		resource.ESClient.Stop()
+	}
+
+	// Stop all the cron jobs.
+	if resource.Corn != nil {
+		resource.Corn.StopJobs()
+	}
+
+	// If any error occurred during the resource cleanup, return the combined error.
+	if len(errs) > 0 {
+		var combinedErr error
+		for _, err := range errs {
+			combinedErr = fmt.Errorf("%v; %w", combinedErr, err)
+		}
+		return combinedErr
+	}
+
+	return nil
+}
+func CloseMySQL() error {
+	if resource.MySQLClient != nil {
+		sqlDB, err := resource.MySQLClient.DB()
+		if err != nil {
+			return err
+		}
+		return sqlDB.Close()
+	}
 	return nil
 }
