@@ -1,15 +1,15 @@
 package alarm
 
 import (
-	"go.uber.org/zap"
 	"net/http"
 	"os"
-	"project/library/resource"
 
+	"project/library/resource"
 	"project/library/types"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 func List(c *gin.Context) {

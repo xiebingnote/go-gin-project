@@ -1,9 +1,10 @@
 package controller
 
 import (
-	"github.com/gin-gonic/gin"
 	"project/servers/httpserver/controller/alarm"
 	"project/servers/httpserver/controller/test"
+
+	"github.com/gin-gonic/gin"
 )
 
 // Router registers the routes for the controllers.

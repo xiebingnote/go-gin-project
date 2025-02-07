@@ -1,8 +1,9 @@
 package httpserver
 
 import (
-	"github.com/gin-gonic/gin"
 	"project/servers/httpserver/controller"
+
+	"github.com/gin-gonic/gin"
 )
 
 func Router(r *gin.RouterGroup) {

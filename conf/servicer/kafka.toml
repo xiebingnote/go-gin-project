@@ -1,0 +1,13 @@
+[Kafka]
+Brokers = ["kafka1:9092", "kafka2:9092", "kafka3:9092"]  # 集群地址
+ProducerTopic = "orders"
+ConsumerTopic = "order_status"
+GroupID = "order-processor"
+Version = "3.5.1"  # 需要与 Kafka 集群版本严格匹配
+
+# 高级配置
+[Kafka.Advanced]
+ProducerMaxRetry = 3                  # 生产者最大重试次数
+ConsumerSessionTimeout = 30000        # 消费者会话超时（ms）
+HeartbeatInterval = 3000              # 心跳间隔（ms）
+MaxProcessingTime = 120000            # 最大处理时间（ms）

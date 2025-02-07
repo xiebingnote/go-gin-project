@@ -1,0 +1,35 @@
+[Log]
+# log level: debug, info, warn, error
+DefaultLevel = "info"
+
+# log directory
+LogDir = "/var/log"
+
+# log file name
+LogFileDebug = "debug.log"
+LogFileInfo = "info.log"
+LogFileWarn = "warn.log"
+LogFileError = "error.log"
+
+# MaxSize is the maximum size in megabytes of a log file before it gets rotated.
+# It defaults to 1000 MB
+MaxSize = 1000
+
+# MaxAge is the maximum number of days to retain old log files based on the timestamp
+# encoded in their filename. Note that a day is defined as 24 hour, regardless of
+# whether the calendar day has 24 hours.
+# It defaults to 30 days
+MaxAge = 30
+
+# MaxBackups is the maximum number of old log files to retain.  The default is to retain
+# all old log files (though MaxAge may still cause them to get deleted.)
+# It defaults to 300 backups
+MaxBackups = 300
+
+# LocalTime determines if the time used for formatting the timestamps in backup files is
+# the computer's local time.  The default is to use UTC times.
+LocalTime = true
+
+# Compress determines if the rotated log files should be compressed using gzip.
+# The default is not to compress rotated files.
+Compress = true

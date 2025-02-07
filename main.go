@@ -3,13 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap"
 	"net/http"
+	"time"
+
 	"project/bootstrap"
 	"project/library/resource"
 	"project/pkg/shutdown"
 	"project/servers"
-	"time"
+
+	"go.uber.org/zap"
 )
 
 // main starts the entire application, initializes the necessary components, and starts the server.

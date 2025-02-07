@@ -1,0 +1,10 @@
+[Redis]
+Addr = "127.0.0.1:6379"
+Password = ""
+DB = 0
+PoolSize = 10
+MinIdleConns = 5
+MaxRetries = 3
+DialTimeout = 5000
+ReadTimeout = 3000
+WriteTimeout = 3000

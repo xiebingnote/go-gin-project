@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"project/library/config"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -164,7 +166,7 @@ func NewJsonLogger(opts ...Option) (*zap.Logger, error) {
 	opt := &option{
 		level:  DefaultLevel,
 		fields: make(map[string]string),
-		logDir: "./log",
+		logDir: config.LogConfig.Log.LogDir,
 	}
 
 	for _, f := range opts {
@@ -198,10 +200,10 @@ func NewJsonLogger(opts ...Option) (*zap.Logger, error) {
 		return nil, err
 	}
 
-	debugWriter := newLogWriter(filepath.Join(opt.logDir, "debug.log"))
-	infoWriter := newLogWriter(filepath.Join(opt.logDir, "info.log"))
-	warnWriter := newLogWriter(filepath.Join(opt.logDir, "warn.log"))
-	errorWriter := newLogWriter(filepath.Join(opt.logDir, "error.log"))
+	debugWriter := newLogWriter(filepath.Join(opt.logDir, config.LogConfig.Log.LogFileDebug))
+	infoWriter := newLogWriter(filepath.Join(opt.logDir, config.LogConfig.Log.LogFileInfo))
+	warnWriter := newLogWriter(filepath.Join(opt.logDir, config.LogConfig.Log.LogFileWarn))
+	errorWriter := newLogWriter(filepath.Join(opt.logDir, config.LogConfig.Log.LogFileError))
 
 	// Create the debug core
 	debugCore := zapcore.NewCore(
@@ -271,14 +273,26 @@ func NewJsonLogger(opts ...Option) (*zap.Logger, error) {
 // will rotate the file when it reaches the maximum size specified by the
 // MaxSize parameter. The logger will also keep a maximum of 300 backups
 // and will delete any backups older than 30 days.
+//
+// The logger will also use the local time zone when writing log entries.
+// If the Compress option is true, the logger will compress the log
+// entries using gzip.
 func newLogWriter(file string) io.Writer {
+	// Create a new lumberjack.Logger that implements the io.Writer interface
+	// The logger will write to the file specified by the file parameter and
+	// will rotate the file when it reaches the maximum size specified by the
+	// MaxSize parameter. The logger will also keep a maximum of 300 backups
+	// and will delete any backups older than 30 days.
+	// The logger will also use the local time zone when writing log entries.
+	// If the Compress option is true, the logger will compress the log
+	// entries using gzip.
 	return &lumberjack.Logger{
-		Filename:   file, // 文件路径
-		MaxSize:    128,  // 单个文件最大尺寸，默认单位 M
-		MaxBackups: 300,  // 最多保留 300 个备份
-		MaxAge:     30,   // 最大时间，默认单位 day
-		LocalTime:  true, // 使用本地时间
-		Compress:   true, // 是否压缩
+		Filename:   file,
+		MaxSize:    config.LogConfig.Log.MaxSize,
+		MaxBackups: config.LogConfig.Log.MaxBackups,
+		MaxAge:     config.LogConfig.Log.MaxAge,
+		LocalTime:  config.LogConfig.Log.LocalTime,
+		Compress:   config.LogConfig.Log.Compress,
 	}
 }
 

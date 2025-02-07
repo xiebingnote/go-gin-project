@@ -16,6 +16,7 @@ Retry = 2
 # Random 随机
 [Strategy]
 Name = "Random"
+
 # 资源定位配置必须有且只有一项
 # 资源定位：使用 BNS
 [Resource.Manual]

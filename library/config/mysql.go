@@ -2,6 +2,7 @@ package config
 
 import "time"
 
+// MySQLConfigEntry MySQL config entry
 type MySQLConfigEntry struct {
 	Name         string        `toml:"Name"`
 	ConnTimeOut  time.Duration `toml:"ConnTimeOut"`  // 单位：ms
