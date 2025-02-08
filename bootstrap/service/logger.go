@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"project/library/config"
 	"project/library/resource"
 	"project/pkg/logger"
 )
@@ -15,10 +16,10 @@ import (
 func InitLogger(ctx context.Context) {
 	var err error
 	resource.LoggerService, err = logger.NewJsonLogger(
-		logger.WithField("app", "project"),   // 添加全局字段
-		logger.WithField("version", "1.0.0"), // 添加全局字段
-		logger.WithDebugLevel(),              // 设置日志级别为 Debug
-		logger.WithLogDir("./log"),           // 设置日志目录
+		//logger.WithDisableConsole(),
+		logger.WithDebugLevel(),                                          // 设置日志级别为 Debug
+		logger.WithLogDir(config.LogConfig.Log.LogDir),                   // 设置日志目录
+		logger.WithField("version", config.ServerConfig.Version.Version), // 添加全局字段
 
 	)
 	if err != nil {

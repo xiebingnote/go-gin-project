@@ -31,3 +31,8 @@ IdleTimeout = 3000
 # 监听一个独立的端口
 # 端口 port.Admin 定义在 app.toml
 Listen = "0.0.0.0:8081"
+
+# 版本信息
+[Version]
+# 版本号
+Version = "1.0.0"

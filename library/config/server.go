@@ -14,4 +14,7 @@ type ServerConfigEntry struct {
 	AdminServer struct {
 		Listen string `toml:"Listen"`
 	} `toml:"AdminServer"`
+	Version struct {
+		Version string `toml:"Version"`
+	} `toml:"Version"`
 }

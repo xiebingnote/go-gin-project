@@ -7,7 +7,7 @@ import (
 
 	"project/bootstrap/service"
 	"project/library/resource"
-	pkglogger "project/pkg/logger"
+	"project/pkg/logger"
 )
 
 // MustInit initializes the necessary components of the application.
@@ -32,13 +32,13 @@ func MustInit(ctx context.Context) {
 	service.InitLogger(ctx)
 
 	//service.InitMySQL(ctx)
-
+	//
 	//service.InitRedis(ctx)
-
+	//
 	//service.InitES(ctx)
-
+	//
 	//service.InitKafka(ctx)
-
+	//
 	//service.InitEnforcer(ctx)
 
 	service.InitCron(ctx)
@@ -65,7 +65,7 @@ func Close() error {
 
 	// Close the logger.
 	if resource.LoggerService != nil {
-		if err := pkglogger.Close(resource.LoggerService); err != nil {
+		if err := logger.Close(resource.LoggerService); err != nil {
 			errs = append(errs, fmt.Errorf("failed to close logger: %w", err))
 		}
 	}
