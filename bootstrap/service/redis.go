@@ -8,7 +8,7 @@ import (
 	"project/library/config"
 	"project/library/resource"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 // InitRedis initializes the Redis database connection.
@@ -55,17 +55,5 @@ func InitRedisClient() error {
 	}
 
 	resource.RedisClient = RedisClient
-	return nil
-}
-
-// CloseRedis closes the Redis client connection.
-//
-// It returns an error if the connection to the Redis server cannot be closed.
-func CloseRedis() error {
-	if resource.RedisClient != nil {
-		// Close the Redis client connection
-		return resource.RedisClient.Close()
-	}
-	// No client to close, return immediately without an error
 	return nil
 }
