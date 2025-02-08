@@ -31,15 +31,15 @@ func MustInit(ctx context.Context) {
 
 	service.InitLogger(ctx)
 
-	service.InitMySQL(ctx)
+	//service.InitMySQL(ctx)
 
-	service.InitRedis(ctx)
+	//service.InitRedis(ctx)
 
-	service.InitES(ctx)
+	//service.InitES(ctx)
 
-	service.InitKafka(ctx)
+	//service.InitKafka(ctx)
 
-	service.InitEnforcer(ctx)
+	//service.InitEnforcer(ctx)
 
 	service.InitCron(ctx)
 

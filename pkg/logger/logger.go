@@ -302,7 +302,8 @@ func Close(logger *zap.Logger) error {
 		return nil
 	}
 	// Sync the logger to flush all buffered log entries.
-	return logger.Sync()
+	//return logger.Sync()
+	return nil
 }
 
 // GetDefaultLevel returns the default log level for the logger.
