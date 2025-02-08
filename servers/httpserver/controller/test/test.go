@@ -3,12 +3,12 @@ package test
 import (
 	"net/http"
 
-	"project/library/types"
+	resp "project/library/response"
 
 	"github.com/gin-gonic/gin"
 )
 
 func Test(c *gin.Context) {
 
-	c.JSON(http.StatusOK, types.NewOKRestResp(nil, ""))
+	c.JSON(http.StatusOK, resp.NewOKRestResp(nil, ""))
 }

@@ -1,4 +1,4 @@
-package types
+package request
 
 // PageOrderReq is a struct that represents the request parameters for pagination and ordering.
 type PageOrderReq struct {

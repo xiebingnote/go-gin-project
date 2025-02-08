@@ -2,6 +2,7 @@ package resource
 
 import (
 	"github.com/IBM/sarama"
+	"github.com/casbin/casbin/v2"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/go-redis/redis/v8"
 	"github.com/olivere/elastic/v7"
@@ -16,3 +17,4 @@ var MySQLClient *gorm.DB
 var RedisClient *redis.Client
 var KafkaProducer sarama.SyncProducer
 var KafkaConsumer sarama.ConsumerGroup
+var Enforcer *casbin.Enforcer

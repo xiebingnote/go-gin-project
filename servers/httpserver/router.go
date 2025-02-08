@@ -8,4 +8,5 @@ import (
 
 func Router(r *gin.RouterGroup) {
 	controller.Router(r.Group("/v1"))
+	controller.Router(r.Group("/v2"))
 }

@@ -54,6 +54,7 @@ func InitRedisClient() error {
 		return fmt.Errorf("redis ping failed: %w", err)
 	}
 
+	resource.RedisClient = RedisClient
 	return nil
 }
 

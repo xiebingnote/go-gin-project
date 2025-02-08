@@ -11,7 +11,9 @@ import (
 )
 
 // MustInit initializes the necessary components of the application.
+//
 // It is a convenience function that calls the following functions in order:
+//
 //   - hookStd: configures the standard logger to include date, time, file, and line number
 //   - initLogger: initializes the LoggerService with a production-ready logger
 //   - initConfig: initializes the configuration
@@ -20,6 +22,8 @@ import (
 //   - initES: initializes the ElasticSearch database
 //   - initCron: initializes the cron scheduler
 //   - TaskStart: starts the one-off tasks
+//
+// If any of the initialization functions return an error, this function will panic with the error.
 func MustInit(ctx context.Context) {
 	hookStd()
 
@@ -34,6 +38,8 @@ func MustInit(ctx context.Context) {
 	service.InitES(ctx)
 
 	service.InitKafka(ctx)
+
+	service.InitEnforcer(ctx)
 
 	service.InitCron(ctx)
 

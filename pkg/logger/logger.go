@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"project/library/common"
 	"project/library/config"
 
 	"go.uber.org/zap"
@@ -13,13 +14,9 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-const (
-	DefaultLevel      = zapcore.InfoLevel
-	DefaultTimeLayout = time.RFC3339
-)
-
 type Option func(o *option)
 
+// option is the configuration options for the logger.
 type option struct {
 	level          zapcore.Level
 	fields         map[string]string
@@ -164,7 +161,7 @@ func WithLogDir(logDir string) Option {
 //   - WithLogDir: sets the log directory to the specified path.
 func NewJsonLogger(opts ...Option) (*zap.Logger, error) {
 	opt := &option{
-		level:  DefaultLevel,
+		level:  GetDefaultLevel(),
 		fields: make(map[string]string),
 		logDir: config.LogConfig.Log.LogDir,
 	}
@@ -173,7 +170,7 @@ func NewJsonLogger(opts ...Option) (*zap.Logger, error) {
 		f(opt)
 	}
 
-	timeLayout := DefaultTimeLayout
+	timeLayout := common.DefaultTimeLayout
 	if opt.timeLayout != "" {
 		timeLayout = opt.timeLayout
 	}
@@ -306,4 +303,25 @@ func Close(logger *zap.Logger) error {
 	}
 	// Sync the logger to flush all buffered log entries.
 	return logger.Sync()
+}
+
+// GetDefaultLevel returns the default log level for the logger.
+// It checks the DefaultLevel field in the LogConfig struct and returns
+// the corresponding zapcore.Level value.
+// If the value in the configuration is invalid, it returns zapcore.InfoLevel.
+func GetDefaultLevel() zapcore.Level {
+	// Check the value in the configuration and return the corresponding zapcore.Level
+	switch config.LogConfig.Log.DefaultLevel {
+	case common.LogLevelDebug:
+		return zapcore.DebugLevel
+	case common.LogLevelInfo:
+		return zapcore.InfoLevel
+	case common.LogLevelWarn:
+		return zapcore.WarnLevel
+	case common.LogLevelError:
+		return zapcore.ErrorLevel
+	default:
+		// If the value in the configuration is invalid, return zapcore.InfoLevel
+		return zapcore.InfoLevel
+	}
 }

@@ -13,6 +13,7 @@ import (
 // from a TOML file and assigned to the corresponding global configuration variable.
 // If any error occurs during decoding, the function panics with the error message.
 func initConfig() {
+
 	// Load Log configuration
 	if _, err := toml.DecodeFile("/Users/Mac/GolandProjects/project/conf/log/log.toml", &config.LogConfig); err != nil {
 		panic(err.Error())

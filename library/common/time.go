@@ -12,26 +12,6 @@ import (
 	"github.com/jinzhu/now"
 )
 
-const (
-	LayoutDateTime       = "2006-01-02 15:04:05"
-	LayoutDate           = "2006-01-02"
-	LayoutMonth          = "2006-01"
-	LayoutDateHourNoDash = "2006010215"
-)
-
-const (
-	TimeTypeDay TimeType = iota + 1
-	TimeTypeWeek
-	TimeTypeMonth
-	TimeTypeHour
-	TimeType6Hour
-	TimeType12Hour
-)
-const (
-	IntervalTypeHour = "hour"
-	IntervalTypeDay  = "day"
-)
-
 type TimeType int
 
 // init initializes the now package with a custom week start day.
@@ -262,9 +242,9 @@ func GetTimeRangeSliceByTimeType(timeType TimeType) ([]time.Time, error) {
 	return timeSlice, nil
 }
 
-// GetPgInterval returns the PostgreSQL interval string for a given time type.
+// GetPgInterval returns the PostgresSQL interval string for a given time type.
 //
-// This function maps the provided TimeType to a corresponding PostgreSQL interval
+// This function maps the provided TimeType to a corresponding PostgresSQL interval
 // string, which can be used to specify the time range for queries. The mapping
 // is as follows:
 //   - TimeTypeDay: returns "hour"
@@ -277,7 +257,7 @@ func GetTimeRangeSliceByTimeType(timeType TimeType) ([]time.Time, error) {
 // If the TimeType is not recognized, the function returns an error indicating
 // an invalid time type.
 func GetPgInterval(timeType TimeType) (string, error) {
-	// The PostgreSQL interval is used to specify the time range for a query.
+	// The PostgresSQL interval is used to specify the time range for a query.
 	// The interval is determined by the time type.
 	var interval string
 	switch timeType {
@@ -302,14 +282,14 @@ func GetPgInterval(timeType TimeType) (string, error) {
 		// If the time type is not recognized, return an error.
 		return "", fmt.Errorf("invalid time type")
 	}
-	// Return the PostgreSQL interval.
+	// Return the PostgresSQL interval.
 	return interval, nil
 }
 
-// GetPgTimeLayout returns the PostgreSQL time layout string for a given time type.
+// GetPgTimeLayout returns the PostgresSQL time layout string for a given time type.
 //
-// The function maps the provided TimeType to a corresponding PostgreSQL time
-// layout string, which can be used to format the time field in a PostgreSQL query.
+// The function maps the provided TimeType to a corresponding PostgresSQL time
+// layout string, which can be used to format the time field in a PostgresSQL query.
 // The mapping is as follows:
 //   - TimeTypeDay: returns "yyyy-MM-dd HH24:00"
 //   - TimeTypeWeek: returns "yyyy-MM-dd"
@@ -321,7 +301,7 @@ func GetPgInterval(timeType TimeType) (string, error) {
 // If the TimeType is not recognized, the function returns an error indicating
 // an invalid time type.
 func GetPgTimeLayout(timeType TimeType) (string, error) {
-	// The PostgreSQL time layout is used to format the time field in a query.
+	// The PostgresSQL time layout is used to format the time field in a query.
 	// The layout is determined by the time type.
 	var layout string
 	switch timeType {
@@ -346,7 +326,7 @@ func GetPgTimeLayout(timeType TimeType) (string, error) {
 		// If the time type is not recognized, return an error.
 		return "", fmt.Errorf("invalid time type")
 	}
-	// Return the PostgreSQL time layout.
+	// Return the PostgresSQL time layout.
 	return layout, nil
 }
 

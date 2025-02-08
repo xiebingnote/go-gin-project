@@ -28,7 +28,7 @@ import (
 //   - mainSrv: The HTTP server for the main interface.
 //   - adminSrv: The HTTP server for the admin interface.
 //   - errChan: A channel for receiving errors from the servers.
-func Start(ctx context.Context) (mainSrv *http.Server, adminSrv *http.Server, errChan chan error) {
+func Start(_ context.Context) (mainSrv *http.Server, adminSrv *http.Server, errChan chan error) {
 
 	// Create an error channel with a buffer size of 2 to capture errors from both servers.
 	errChan = make(chan error, 2)
@@ -38,7 +38,7 @@ func Start(ctx context.Context) (mainSrv *http.Server, adminSrv *http.Server, er
 	go func() {
 		// Run the main server and send any errors to the error channel.
 		if err := runServer(mainSrv, "Main"); err != nil {
-			errChan <- fmt.Errorf("Main server failed: %w", err)
+			errChan <- fmt.Errorf("main server failed: %w", err)
 		}
 	}()
 
@@ -47,7 +47,7 @@ func Start(ctx context.Context) (mainSrv *http.Server, adminSrv *http.Server, er
 	go func() {
 		// Run the admin server and send any errors to the error channel.
 		if err := runServer(adminSrv, "Admin"); err != nil {
-			errChan <- fmt.Errorf("Admin server failed: %w", err)
+			errChan <- fmt.Errorf("admin server failed: %w", err)
 		}
 	}()
 
@@ -80,7 +80,7 @@ func newMainServer(cfg *config.ServerConfigEntry, handler http.Handler) *http.Se
 //   - handler: The HTTP handler for processing admin requests.
 //
 // Returns:
-//   - A pointer to an http.Server configured for the admin interface.
+//   - A pointer to a http.Server configured for the admin interface.
 func newAdminServer(cfg *config.ServerConfigEntry, handler http.Handler) *http.Server {
 	// Create a new HTTP server with the given configuration.
 	return &http.Server{
