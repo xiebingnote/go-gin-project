@@ -49,6 +49,12 @@ func MustInit(ctx context.Context) {
 // hookStd configures the standard logger to include date, time, file, and line number
 // in the log output. It sets the log flags to display the date in the local time zone,
 // the file name, the line number, and the microsecond precision time.
+//
+// The log flags are set as follows:
+//
+//   - log.LstdFlags: displays the date in the local time zone
+//   - log.Lshortfile: displays the file name
+//   - log.Lmicroseconds: displays the time in microsecond precision
 func hookStd() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
 }

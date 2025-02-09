@@ -47,7 +47,6 @@ func InitRedisClient() error {
 	})
 
 	// Test the connection to the Redis server with a ping
-	// 测试连接
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if _, err := RedisClient.Ping(ctx).Result(); err != nil {

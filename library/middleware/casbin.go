@@ -66,7 +66,16 @@ func CasbinMiddleware(enforcer *casbin.Enforcer) gin.HandlerFunc {
 // The token is signed with the JWTSecret and contains the userID, role, and an expiration time.
 // The expiration time is currently set to 24 hours, but this can be adjusted as needed.
 // It returns the signed JWT token as a string, or an error if the token cannot be generated.
+//
+// Parameters:
+//   - userID: The ID of the user to generate the token for.
+//   - role: The role of the user to generate the token for.
+//
+// Returns:
+//   - A string containing the signed JWT token.
+//   - An error if the token cannot be generated.
 func GenerateTokenCasbin(userID uint, role string) (string, error) {
+	// Create a JWT token with the specified claims
 	claims := jwt.MapClaims{
 		// Store the user ID in the token
 		"user_id": userID,

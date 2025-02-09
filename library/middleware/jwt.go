@@ -19,6 +19,7 @@ func AuthMiddlewareJWT(c *gin.Context) {
 	// Get the token from the request header
 	token := c.GetHeader("Authorization")
 	if token == "" {
+		// Abort the request if the token is missing
 		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
 		return
 	}
@@ -26,6 +27,7 @@ func AuthMiddlewareJWT(c *gin.Context) {
 	// Verify the token and extract the userID
 	userID, err := verifyToken(token)
 	if err != nil {
+		// Abort the request if the token is invalid
 		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
 		return
 	}
@@ -39,38 +41,57 @@ func AuthMiddlewareJWT(c *gin.Context) {
 
 // verifyToken verifies the JWT token and returns the userID if it's valid.
 // If the token is invalid, it returns an error.
+// It takes a JWT token as an argument and returns the userID as a uint.
+// The userID is extracted from the token by looking for a "user_id" key in the
+// token's claims. If the key is not present or the type is unexpected, it returns
+// an error.
 func verifyToken(token string) (uint, error) {
-	// Parse the token
+	// Parse the token with the provided key function
 	parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
-		// Make sure the token is signed with the same secret we use
+		// Check the signing method to ensure it matches our expectation
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
+		// Return the secret key for signature verification
 		return jwtSecret, nil
 	})
 	if err != nil {
+		// Return an error if parsing fails
 		return 0, err
 	}
 
-	// Get the claims from the token
+	// Extract claims from the parsed token
 	claims, ok := parsedToken.Claims.(jwt.MapClaims)
 	if !ok {
+		// Return an error if claims type is unexpected
 		return 0, fmt.Errorf("unexpected token claims type: %T", parsedToken.Claims)
 	}
 
-	// Extract the userID from the claims
+	// Retrieve the userID from claims
 	userID, ok := claims["user_id"]
 	if !ok {
+		// Return an error if the userID is missing in claims
 		return 0, fmt.Errorf("unexpected token claims: %v", claims)
 	}
 
-	// Return the userID
+	// Return the extracted userID, casting it to uint
 	return uint(userID.(float64)), nil
 }
 
 // GenerateTokenJWT generates a JWT token for the given userID.
-// The token is signed with the jwtSecret and contains the userID and an expiration time.
-// The expiration time is currently set to 24 hours, but this can be adjusted as needed.
+//
+// The token is signed with the jwtSecret and contains the following claims:
+//   - user_id: The userID of the user.
+//   - exp: The expiration time of the token, which is currently set to 24 hours.
+//
+// The expiration time can be adjusted as needed.
+//
+// Parameters:
+//   - userID: The userID to be included in the token.
+//
+// Returns:
+//   - A string containing the generated JWT token.
+//   - An error if token generation fails.
 func GenerateTokenJWT(userID uint) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": userID,
@@ -81,13 +102,23 @@ func GenerateTokenJWT(userID uint) (string, error) {
 	return token.SignedString(jwtSecret)
 }
 
-// ParseToken parses the given token string and returns a jwt.Token object
-// containing the claims of the token.
+// ParseToken parses the given JWT token string and returns a jwt.Token object.
+// It uses the jwtSecret to validate the token's signature.
+//
+// Parameters:
+//   - tokenString: The JWT token string to be parsed.
+//
+// Returns:
+//   - A pointer to a jwt.Token object containing the claims if the token is valid.
+//   - An error if the token is invalid or if parsing fails.
 func ParseToken(tokenString string) (*jwt.Token, error) {
 	return jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Ensure the token's signing method is what we expect.
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+
 		// Return the secret key to use for parsing the token.
-		// This should be a secret key, but for the sake of simplicity,
-		// we'll just use a hard-coded string here.
 		return jwtSecret, nil
 	})
 }

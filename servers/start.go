@@ -58,7 +58,16 @@ func Start(_ context.Context) (mainSrv *http.Server, adminSrv *http.Server, errC
 // newMainServer creates a new HTTP server for the main interface.
 //
 // The server is configured with the given configuration and uses the given
-// handler for the main routes.
+// handler for the main routes. This function creates a new HTTP server with the
+// provided configuration and handler. The server will listen on the specified
+// address and will use the provided handler for processing requests.
+//
+// Parameters:
+//   - cfg: The ServerConfigEntry containing configuration settings for the main server.
+//   - handler: The HTTP handler for processing main requests.
+//
+// Returns:
+//   - A pointer to a http.Server configured for the main interface.
 func newMainServer(cfg *config.ServerConfigEntry, handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:         cfg.HTTPServer.Listen,       // Listen address for the main server.
@@ -93,8 +102,16 @@ func newAdminServer(cfg *config.ServerConfigEntry, handler http.Handler) *http.S
 }
 
 // runServer starts the HTTP server and listens for incoming requests.
+//
 // If the server fails to start or encounters an error (other than a closed server error),
 // it returns an error with a formatted message indicating the server name.
+//
+// Parameters:
+//   - srv: The HTTP server to run.
+//   - name: The name of the server to format in the error message.
+//
+// Returns:
+//   - An error indicating the reason for the server failure.
 func runServer(srv *http.Server, name string) error {
 	// Attempt to start the server and listen for incoming requests.
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -106,20 +123,23 @@ func runServer(srv *http.Server, name string) error {
 }
 
 // NewAdminServer returns a new HTTP handler for the admin interface.
+//
 // The returned handler registers the following endpoints:
 //   - /debug/pprof/ (via gin.WrapH(http.DefaultServeMux)): the pprof debug endpoints.
 //   - /metrics: a test endpoint that returns a 200 OK response with the text "Metrics endpoint".
 func NewAdminServer() http.Handler {
-	// Create a new Gin router.
+	// Create a new Gin router for handling admin routes.
 	router := gin.New()
 
-	// Register the admin endpoints.
+	// Register the pprof debug endpoints using the default HTTP ServeMux.
 	router.GET("/debug/pprof/", gin.WrapH(http.DefaultServeMux))
+
 	// Register a test endpoint that returns a 200 OK response with the text "Metrics endpoint".
 	router.GET("/metrics", func(c *gin.Context) {
+		// Respond with a 200 OK status and a message.
 		c.String(http.StatusOK, "Metrics endpoint")
 	})
 
-	// Return the registered admin handler.
+	// Return the configured Gin router as the admin HTTP handler.
 	return router
 }

@@ -26,6 +26,12 @@ type Response struct {
 // It sets the Success field to true, indicating that the request was processed successfully.
 // The ErrMsg field is an empty string as there is no error. The RequestID is set to the provided
 // reqID, allowing for tracking of the request. The Data field holds the response data.
+//
+// Parameters:
+//   - data: any, the payload of the response
+//   - reqID: string, the unique identifier for the request
+//
+// Returns: *Response, a pointer to a Response struct
 func NewOKRestResp(data any, reqID string) *Response {
 	return &Response{
 		Code:      http.StatusOK, // HTTP 200 OK

@@ -17,6 +17,8 @@ import (
 // client is stored as a singleton in the resource package for use throughout
 // the application. If the configuration file decoding fails, the function
 // panics with an error.
+//
+// The function takes a context.Context parameter, but does not currently use it.
 func InitES(_ context.Context) {
 
 	// Initialize the ES client with the decoded configuration.

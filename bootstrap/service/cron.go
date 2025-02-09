@@ -11,16 +11,14 @@ import (
 )
 
 // InitCron initializes the Corn field of the resource package with a new scheduler.
-// The scheduler is configured to use the local time zone.
-// If the scheduler creation fails, the function logs the error and exits.
-// If the time zone loading fails, the function logs the error and exits.
-// After successful creation, the scheduler is started.
+// The scheduler is configured to use the local time zone. If the scheduler creation
+// or time zone loading fails, the function logs the error and exits.
 func InitCron(_ context.Context) {
 	// Attempt to load the local time zone.
 	jst, err := time.LoadLocation(time.Local.String())
 	if err != nil {
 		// Log and exit if loading the time zone fails.
-		log.Fatalf("time.LoadLocation(%s) error(%v)", time.Local.String(), err)
+		log.Fatalf("Failed to load time location: %s, error: %v", time.Local.String(), err)
 		return
 	}
 
@@ -28,7 +26,7 @@ func InitCron(_ context.Context) {
 	resource.Corn, err = gocron.NewScheduler(gocron.WithLocation(jst))
 	if err != nil {
 		// Log and exit if scheduler creation fails.
-		log.Fatalf("gocron.NewScheduler() error(%v)", err)
+		log.Fatalf("Failed to create a new scheduler, error: %v", err)
 		return
 	}
 
