@@ -93,7 +93,7 @@ func GenerateTokenCasbin(userID uint, role string) (string, error) {
 }
 
 // AuthMiddlewareCasbin is a Gin middleware function that authenticates the request by verifying a JWT token in the Authorization header.
-// It extracts the user ID and role from the token and stores them in the Gin context, making them available to subsequent middleware and handlers.
+// It extracts the user ID and role from the token and stores them in the Gin context, making them available to later middleware and handlers.
 //
 // If the token is missing, invalid, or expired, it aborts the request with a 401 Unauthorized status.
 //

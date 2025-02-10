@@ -41,8 +41,8 @@ func AuthMiddlewareJWT(c *gin.Context) {
 
 // verifyToken verifies the JWT token and returns the userID if it's valid.
 // If the token is invalid, it returns an error.
-// It takes a JWT token as an argument and returns the userID as a uint.
-// The userID is extracted from the token by looking for a "user_id" key in the
+// It takes a JWT token as an argument and returns the userID as an uint.
+// The userID is extracted from the token by looking for an "user_id" key in the
 // token's claims. If the key is not present or the type is unexpected, it returns
 // an error.
 func verifyToken(token string) (uint, error) {

@@ -15,7 +15,7 @@ import (
 // for high-performance and structured logging in production environments.
 //
 // The function takes a context.Context parameter, but does not currently use it.
-func InitLogger(ctx context.Context) {
+func InitLogger(_ context.Context) {
 	var err error
 	resource.LoggerService, err = logger.NewJsonLogger(
 		//logger.WithDisableConsole(), // Disable console logging

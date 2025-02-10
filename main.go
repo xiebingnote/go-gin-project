@@ -77,7 +77,7 @@ func main() {
 //   - srv: The HTTP server to be shut down.
 func shutdownServer(name string, srv *http.Server) {
 	resource.LoggerService.Info(fmt.Sprintf("Closing %s server...", name))
-	// Create a context with a 5 second timeout to ensure the server has time to stop
+	// Create a context with a 5-second timeout to ensure the server has time to stop
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

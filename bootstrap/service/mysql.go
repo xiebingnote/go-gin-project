@@ -90,7 +90,7 @@ func InitMySQLClient() error {
 // Returns:
 //   - A logger.Interface configured for GORM logging.
 func newGormLogger(cfg *config.MySQLConfigEntry) logger.Interface {
-	// Default log level is set to Silent to suppress logs
+	// The Default log level is set to Silent to suppress logs
 	logLevel := logger.Silent
 
 	// Set log level to Info if SQLLogLen or SQLArgsLogLen is non-zero
@@ -100,7 +100,7 @@ func newGormLogger(cfg *config.MySQLConfigEntry) logger.Interface {
 
 	// Create and return a new GORM logger with the specified configuration
 	return logger.New(
-		// Use standard library log to write to os.Stdout
+		// Use the standard library log to write to os.Stdout
 		log.New(os.Stdout, "\r\n", log.LstdFlags),
 		logger.Config{
 			SlowThreshold:             time.Second, // Slow query threshold

@@ -10,7 +10,7 @@ import (
 	"project/pkg/logger"
 )
 
-// MustInit initializes the necessary components of the application.
+// MustInit initializes the necessary parts of the application.
 //
 // It is a convenience function that calls the following functions in order:
 //
@@ -59,7 +59,7 @@ func hookStd() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
 }
 
-// Close closes all the resources that were initialized by the MustInit function.
+// Close closes all the resources initialized by the MustInit function.
 // It is a convenience function that calls the following functions in order:
 //   - CloseLogger: closes the logger
 //   - CloseMySQL: closes the MySQL client

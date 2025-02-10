@@ -13,11 +13,12 @@ import (
 )
 
 // InitKafka initializes the Kafka client with the configuration specified in
-// the ../conf/kafka.toml file. It reads the configuration parameters required
-// to connect and authenticate with the Kafka cluster. The initialized Kafka
-// client is stored as a singleton in the resource package for use throughout
-// the application. If the configuration file decoding fails, the function
-// panics with an error.
+// the./conf/kafka.toml file.
+// It reads the configuration parameters required
+// to connect and authenticate with the Kafka cluster.
+// The initialized Kafka client is stored as a singleton in the resource package
+// for use throughout the application.
+// If the configuration file decoding fails, the function panics with an error.
 func InitKafka(_ context.Context) {
 	err := InitKafkaClient()
 	if err != nil {
@@ -26,10 +27,13 @@ func InitKafka(_ context.Context) {
 }
 
 // InitKafkaClient initializes the Kafka client with the configuration specified
-// in the ../conf/kafka.toml file. It reads the configuration parameters required
-// to connect and authenticate with the Kafka cluster. The initialized Kafka
+// in the./conf/kafka.toml file.
+// It reads the configuration parameters required
+// to connect and authenticate with the Kafka cluster.
+// The initialized Kafka
 // client is stored as a singleton in the resource package for use throughout the
-// application. If the configuration file decoding fails, the function panics with
+// application.
+// If the configuration file decoding fails, the function panics with
 // an error.
 func InitKafkaClient() error {
 	cfg := config.KafkaConfig
@@ -156,7 +160,7 @@ func (h *KafkaConsumerHandler) Setup(sarama.ConsumerGroupSession) error {
 
 // Cleanup is called once all ConsumeClaim goroutines have exited.
 // It is a last chance to clean up any resources, but it is not
-// a guarantee that it will be called in all cases (e.g. if the
+// a guarantee that it will be called in all cases (e.g., if the
 // process is killed).
 func (h *KafkaConsumerHandler) Cleanup(sarama.ConsumerGroupSession) error {
 	return nil

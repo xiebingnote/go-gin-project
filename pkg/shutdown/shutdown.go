@@ -75,7 +75,7 @@ func (h *hook) WithSignals(signals ...syscall.Signal) Hook {
 // Close.
 //
 // The functions passed to Close will be executed in a separate goroutine. If a
-// function blocks indefinitely, it will be cancelled after the timeout is
+// function blocks indefinitely, it will be canceled after the timeout is
 // reached. If all the functions complete successfully, the program will exit
 // after all the functions have completed. If any of the functions fail, the
 // program will exit immediately after the first failure.

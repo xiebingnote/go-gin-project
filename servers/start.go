@@ -59,7 +59,7 @@ func Start(_ context.Context) (mainSrv *http.Server, adminSrv *http.Server, errC
 //
 // The server is configured with the given configuration and uses the given
 // handler for the main routes. This function creates a new HTTP server with the
-// provided configuration and handler. The server will listen on the specified
+// provided configuration and handler. The server will listen to the specified
 // address and will use the provided handler for processing requests.
 //
 // Parameters:
@@ -67,10 +67,10 @@ func Start(_ context.Context) (mainSrv *http.Server, adminSrv *http.Server, errC
 //   - handler: The HTTP handler for processing main requests.
 //
 // Returns:
-//   - A pointer to a http.Server configured for the main interface.
+//   - A pointer to one http.Server configured for the main interface.
 func newMainServer(cfg *config.ServerConfigEntry, handler http.Handler) *http.Server {
 	return &http.Server{
-		Addr:         cfg.HTTPServer.Listen,       // Listen address for the main server.
+		Addr:         cfg.HTTPServer.Listen,       // Listen to the address for the main server.
 		Handler:      handler,                     // HTTP handler for the main routes.
 		ReadTimeout:  cfg.HTTPServer.ReadTimeout,  // Read timeout for incoming requests.
 		WriteTimeout: cfg.HTTPServer.WriteTimeout, // Write timeout for outgoing responses.
@@ -89,11 +89,11 @@ func newMainServer(cfg *config.ServerConfigEntry, handler http.Handler) *http.Se
 //   - handler: The HTTP handler for processing admin requests.
 //
 // Returns:
-//   - A pointer to a http.Server configured for the admin interface.
+//   - A pointer to one http.Server configured for the admin interface.
 func newAdminServer(cfg *config.ServerConfigEntry, handler http.Handler) *http.Server {
 	// Create a new HTTP server with the given configuration.
 	return &http.Server{
-		Addr:         cfg.AdminServer.Listen,      // Listen address for the admin server.
+		Addr:         cfg.AdminServer.Listen,      // Listen to the address for the admin server.
 		Handler:      handler,                     // HTTP handler for the admin routes.
 		ReadTimeout:  cfg.HTTPServer.ReadTimeout,  // Read timeout for incoming requests.
 		WriteTimeout: cfg.HTTPServer.WriteTimeout, // Write timeout for outgoing responses.
@@ -108,7 +108,7 @@ func newAdminServer(cfg *config.ServerConfigEntry, handler http.Handler) *http.S
 //
 // Parameters:
 //   - srv: The HTTP server to run.
-//   - name: The name of the server to format in the error message.
+//   - name: The name of the server to a format in the error message.
 //
 // Returns:
 //   - An error indicating the reason for the server failure.
@@ -136,7 +136,7 @@ func NewAdminServer() http.Handler {
 
 	// Register a test endpoint that returns a 200 OK response with the text "Metrics endpoint".
 	router.GET("/metrics", func(c *gin.Context) {
-		// Respond with a 200 OK status and a message.
+		// Respond with a 200-OK status and a message.
 		c.String(http.StatusOK, "Metrics endpoint")
 	})
 

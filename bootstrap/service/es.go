@@ -12,10 +12,13 @@ import (
 )
 
 // InitES initializes the Elasticsearch (ES) client using the configuration
-// specified in the ../conf/es.toml file. It reads the configuration parameters
-// required to connect and authenticate with the ES cluster. The initialized ES
+// specified in the./conf/es.toml file.
+// It reads the configuration parameters
+// required to connect and authenticate with the ES cluster.
+// The initialized ES
 // client is stored as a singleton in the resource package for use throughout
-// the application. If the configuration file decoding fails, the function
+// the application.
+// If the configuration file decoding fails, the function
 // panics with an error.
 //
 // The function takes a context.Context parameter, but does not currently use it.
@@ -27,13 +30,13 @@ func InitES(_ context.Context) {
 
 // InitESClient initializes a new ES client with connection pool.
 //
-// The transport is setup with:
+// The transport is set up with:
 //
 // - MaxIdleConns: config.ESConfig.ES.MaxIdleConns
 // - MaxIdleConnsPerHost: config.ESConfig.ES.MaxIdleConnsPerHost
 // - IdleConnTimeout: config.ESConfig.ES.IdleConnTimeout * time.Second
 //
-// The client is setup with:
+// The client is set up with:
 //
 // - SetURL: config.ESConfig.ES.Address
 // - SetBasicAuth: config.ESConfig.ES.Username, config.ESConfig.ES.Password
@@ -63,9 +66,9 @@ func InitESClient() *elastic.Client {
 		elastic.SetBasicAuth(config.ESConfig.ES.Username, config.ESConfig.ES.Password),
 		// SetHttpClient: The HTTP client to use when connecting to Elasticsearch.
 		elastic.SetHttpClient(httpClient),
-		// SetSniff: Whether or not to enable sniffing.
+		// SetSniff: Whether to enable sniffing.
 		elastic.SetSniff(false),
-		// SetHealthcheck: Whether or not to enable health checking.
+		// SetHealthcheck: Whether to enable health checking.
 		elastic.SetHealthcheck(false),
 	)
 

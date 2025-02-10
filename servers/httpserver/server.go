@@ -60,7 +60,7 @@ func NewServer() *gin.Engine {
 //
 // The engine allows:
 //   - The "admin" role to access all routes with any HTTP method.
-//   - The "user" role to perform GET requests on v1 endpoints, and any method on v1 endpoints.
+//   - The "user" role to perform to GET requests on v1 endpoints, and any method on v1 endpoints.
 //
 // The function also groups the "alice" user under the "admin" role.
 //

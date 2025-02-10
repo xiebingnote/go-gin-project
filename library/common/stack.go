@@ -12,7 +12,8 @@ type Stack struct {
 // The returned stack is empty and has a length of 0.
 //
 // The stack is implemented using the container/list package, which provides
-// a doubly-linked list. The list is used as a stack, with the Push method
+// a doubly linked list.
+// The list is used as a stack, with the Push method
 // adding elements to the front of the list and the Pop method removing
 // elements from the front of the list.
 //

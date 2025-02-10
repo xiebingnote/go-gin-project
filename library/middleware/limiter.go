@@ -82,8 +82,8 @@ func RedisLimiter(rate limiter.Rate) gin.HandlerFunc {
 //
 // If the user ID exists, it will get the user ID and use it as a key to store the
 // rate limit context in memory. It will then check if the rate limit has been
-// exceeded. If it has, it will abort the request with a 429 Too Many Requests
-// status and provide information about the rate limit in the response body.
+// exceeded. If it has, it will abort the request with 429 Too Many Requests
+// statuses and provide information about the rate limit in the response body.
 //
 // If the rate limit has not been exceeded, it will proceed to the next middleware
 // or handler.
@@ -135,23 +135,24 @@ func UserIDLimiter(rate limiter.Rate) gin.HandlerFunc {
 
 // IPWhitelist returns a middleware that allows requests only from a specified list of IP addresses.
 //
-// The middleware checks the client IP against the provided whitelist. If the IP is in the whitelist,
-// the request proceeds to the next handler. Otherwise, it aborts the request with a 403 Forbidden status.
+// The middleware checks the client IP against the provided allowlist.
+// If the IP is in the allowlist, the request proceeds to the next handler.
+// Otherwise, it aborts the request with a 403 Forbidden status.
 //
 // Parameters:
-//   - whitelist: A slice of strings containing the whitelisted IP addresses.
+//   - whitelist: A slice of strings containing the allowlisted IP addresses.
 //
 // Returns:
-//   - gin.HandlerFunc: The Gin middleware function for IP whitelisting.
+//   - gin.HandlerFunc: The Gin middleware function for IP allowlisting.
 func IPWhitelist(whitelist []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get the client IP address
 		clientIP := c.ClientIP()
 
-		// Iterate over the whitelist to check if the client IP is allowed
+		// Iterate over the allowlist to check if the client IP is allowed
 		for _, ip := range whitelist {
 			if clientIP == ip {
-				// Proceed to the next handler if the IP is whitelisted
+				// Proceed to the next handler if the IP is allowlisted
 				c.Next()
 				return
 			}

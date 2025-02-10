@@ -64,7 +64,7 @@ func WithWarnLevel() Option {
 // WithErrorLevel returns an Option that sets the logging level to
 // zapcore.ErrorLevel.
 //
-// ErrorLevel is a level that is used when an error has occurred.
+// ErrorLevel is a level used when an error has occurred.
 //
 // Example:
 //
@@ -118,7 +118,7 @@ func WithTimeLayout(timeLayout string) Option {
 
 // WithDisableConsole returns an Option that disables console logging.
 //
-// When this option is applied, log messages will not be printed to the console,
+// When this option is applied, log messages will not be printed to the console
 // but will still be written to the configured log files.
 //
 // Example:
@@ -151,7 +151,7 @@ func WithLogDir(logDir string) Option {
 
 // NewJsonLogger creates a new JSON logger with the given options.
 //
-// The options argument is a variadic list of Option functions that customize
+// The option argument is a variadic list of Option functions that customize
 // the logger. The available options are:
 //
 //   - WithLevel: sets the log level to the specified level.

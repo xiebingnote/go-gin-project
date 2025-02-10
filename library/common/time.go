@@ -114,7 +114,7 @@ func GetBeforeLastMonthTimeRange() (time.Time, time.Time) {
 func (t TimeType) String() string {
 	switch t {
 	case TimeTypeDay:
-		// Represents a day time type
+		// Represents a daytime type
 		return "day"
 	case TimeTypeWeek:
 		// Represents a week time type
@@ -146,7 +146,7 @@ func GetTimeByTimeType(timeType TimeType) (time.Time, time.Time, error) {
 	var start, end time.Time
 	switch timeType {
 	case TimeTypeDay:
-		// For the day time type, the start time is 23 hours ago
+		// For the daytime type, the start time is 23 hours ago
 		start = time.Now().Add(-23 * time.Hour)
 	case TimeTypeWeek:
 		// For the week time type, the start time is 6 days ago
@@ -314,7 +314,7 @@ func GetPgTimeLayout(timeType TimeType) (string, error) {
 		// For TimeTypeWeek and TimeTypeMonth, the layout is 'yyyy-MM-dd'.
 		layout = "yyyy-MM-dd"
 	case TimeTypeHour:
-		// For TimeTypeHour, the layout is 'yyyy-MM-dd HH24:MI'.
+		// For TimeTypeHour, the layout is 'yyyy-MM-dd HH24: MI'.
 		layout = "yyyy-MM-dd HH24:MI"
 	case TimeType6Hour:
 		// For TimeType6Hour, the layout is 'yyyy-MM-dd HH24:00'.
@@ -507,7 +507,7 @@ func SplitTimeRangeBy5Minute(start, end int64) []int64 {
 	})
 }
 
-// increment generates a slice of Unix timestamps by incrementing the start time
+// Increment generates a slice of Unix timestamps by incrementing the start time
 // using the provided addFunc until it surpasses or equals the end time.
 //
 // Parameters:
