@@ -41,6 +41,8 @@ func MustInit(ctx context.Context) {
 	//
 	//service.InitEnforcer(ctx)
 
+	service.InitCommon(ctx)
+
 	service.InitCron(ctx)
 
 	//TaskStart(ctx)

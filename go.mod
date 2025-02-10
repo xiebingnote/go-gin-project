@@ -7,12 +7,14 @@ require (
 	github.com/IBM/sarama v1.45.0
 	github.com/casbin/casbin/v2 v2.11.0
 	github.com/casbin/gorm-adapter/v3 v3.0.2
+	github.com/deckarep/golang-set/v2 v2.7.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-co-op/gocron/v2 v2.15.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/jinzhu/now v1.1.5
 	github.com/olivere/elastic/v7 v7.0.32
+	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/ulule/limiter/v3 v3.11.2
 	go.uber.org/zap v1.27.0
