@@ -1,1 +1,22 @@
 [NSQ]
+# NSQ 集群配置
+NsqLookupdAddress = [
+    "nsqlookupd1:4161",
+    "nsqlookupd2:4161",
+    "nsqlookupd3:4161"
+]
+
+# 生产者配置
+[NSQ.Producer]
+DialTimeout = "5s"  # 连接超时
+MaxAttempts = 3     # 最大重试次数
+Concurrency = 100    # 并发数
+
+# 消费者配置
+[NSQ.Consumer]
+Topic = "test_topic"
+Channel = "test_channel"
+MaxInFlight = 100 # 最大处理中的消息数
+MaxAttempts = 5     # 消息最大重试次数
+RequeueDelay = "30s" # 重试延迟
+HeartbeatInterval = "30s" # 心跳间隔

@@ -1,1 +1,21 @@
 [PostgreSQL]
+# 连接配置
+Host = "127.0.0.1"
+Port = 5432
+User = "root"
+PassWord = "123456"
+DBName = "mydatabase"
+SSLMode = "disable"
+
+# 连接池配置
+[PostgreSQL.Pool]
+MaxConns = 100
+MinConns = 10
+MaxConnLifetime = "30m"
+MaxConnIdleTime = "5m"
+HealthCheckPeriod = "1m"
+
+# 迁移配置
+[PostgreSQL.Migrations]
+Path = "migrations"
+Table = "schema_migrations"

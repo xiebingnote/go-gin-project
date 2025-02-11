@@ -1,1 +1,9 @@
 [Etcd]
+Endpoints = [
+    "http://192.168.0.10:2379",
+    "http://192.168.0.11:2379",
+    "http://192.168.0.12:2379"
+]
+DialTimeout = 5  # 单位：秒
+UserName = "root"
+PassWord = "123456"

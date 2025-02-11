@@ -9,7 +9,7 @@ import (
 
 // Router registers the routes for the controllers.
 //
-// It is expected that the provided gin.RouterGroup is a sub-group of the main
+// It is expected that the provided gin.RouterGroup is a subgroup of the main
 // router.
 func Router(r *gin.RouterGroup) {
 	// Route for the alarm controller.
