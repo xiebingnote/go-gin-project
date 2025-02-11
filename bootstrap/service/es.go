@@ -13,13 +13,13 @@ import (
 
 // InitES initializes the Elasticsearch (ES) client using the configuration
 // specified in the./conf/es.toml file.
-// It reads the configuration parameters
-// required to connect and authenticate with the ES cluster.
-// The initialized ES
-// client is stored as a singleton in the resource package for use throughout
-// the application.
-// If the configuration file decoding fails, the function
-// panics with an error.
+//
+// It reads the configuration parameters required to connect and authenticate
+// with the ES cluster.
+//
+// The initialized ES client is stored as a singleton in the resource package
+// for use throughout the application.
+// If the configuration file decoding fails, the function panics with an error.
 //
 // The function takes a context.Context parameter, but does not currently use it.
 func InitES(_ context.Context) {

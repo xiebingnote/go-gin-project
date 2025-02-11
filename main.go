@@ -14,16 +14,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// main is the entry point of the application, responsible for initializing
+// The main is the entry point of the application, responsible for initializing
 // components, starting the servers, and setting up a shutdown hook to handle
 // graceful termination when receiving system signals.
 // It performs the following tasks:
-//  1. Creates a background context for initialization tasks.
+//  1. Create a background context for initialization tasks.
 //  2. Initializes application components such as configuration, databases, and logging.
 //  3. Starts the main and admin HTTP servers and captures any startup errors.
-//  4. Monitors an error channel for any errors during server startup, logging a fatal error
-//     if any occur, or confirming successful startup.
-//  5. Configures a shutdown hook to gracefully stop the servers and release resources,
+//  4. Monitor an error channel for any errors during server startup, logging a fatal error
+//     if any occur, or confirming a successful startup.
+//  5. Configure a shutdown hook to gracefully stop the servers and release resources,
 //     logging any errors encountered during resource cleanup.
 func main() {
 	// Create a background context for initialization tasks

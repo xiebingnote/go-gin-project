@@ -20,8 +20,8 @@ func init() {
 	now.WeekStartDay = time.Monday
 }
 
-// Ntime returns the current time in Unix timestamp format.
-func Ntime() int64 {
+// NowTime returns the current time in Unix timestamp format.
+func NowTime() int64 {
 	return time.Now().Unix()
 }
 
@@ -590,7 +590,7 @@ func CreateTimePoint(startTime time.Time, endTime time.Time, interval string) (t
 // yearStr: a string representing the year (e.g., "2020").
 func GetYearMonthsTimes(yearStr string) []int64 {
 	// Get the current Unix timestamp.
-	n := Ntime()
+	n := NowTime()
 
 	// Convert the year string to an integer.
 	year := Atoi(yearStr)
@@ -644,7 +644,7 @@ func GetMonthDaysTimes(monthStr string) []int64 {
 	daysInMonth := int(startOfNextMonth.Sub(startOfMonth).Hours() / 24)
 
 	// Get the current Unix timestamp.
-	n := Ntime()
+	n := NowTime()
 
 	// Loop through the range of days, adding each start timestamp to the resulting slice.
 	for day := 0; day <= daysInMonth; day++ {
@@ -685,7 +685,7 @@ func GetWeekDaysTimes(weekStr string) []int64 {
 	// Get the start of the week.
 	startOfWeek := week.BeginningOfWeek()
 
-	n := Ntime()
+	n := NowTime()
 	// Get the current Unix timestamp.
 
 	// Loop through the range of days, adding each start timestamp to the resulting slice.
@@ -720,7 +720,7 @@ func GetDayHoursTimes(dayStr string) []int64 {
 	var hoursTimes []int64
 	// Get the start of the day.
 	startOfDay := timeObj
-	n := Ntime()
+	n := NowTime()
 	// Loop through the range of hours, adding each start timestamp to the resulting slice.
 	for hour := 0; hour <= 24; hour++ {
 		dayTime := startOfDay.Add(time.Hour * time.Duration(hour))

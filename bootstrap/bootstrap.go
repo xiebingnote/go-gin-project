@@ -14,39 +14,55 @@ import (
 //
 // It is a convenience function that calls the following functions in order:
 //
-//   - hookStd: configures the standard logger to include date, time, file, and line number
-//   - initLogger: initializes the LoggerService with a production-ready logger
-//   - initConfig: initializes the configuration
-//   - initMySQL: initializes the MySQL database
-//   - initRedis: initializes the Redis database
-//   - initES: initializes the ElasticSearch database
-//   - initCron: initializes the cron scheduler
-//   - TaskStart: starts the one-off tasks
+//   - HookStd: configures the standard logger to include date, time, file, and line number
+//   - InitConfig: initializes the configuration
+//   - InitLogger: initializes the LoggerService with a production-ready logger
+//   - InitCommon: initializes the common resources
+//   - InitCron: initializes the cron scheduler
+//   - InitEnforcer: initializes the Casbin enforcer
+//   - InitES: initializes the ElasticSearch database
+//   - InitEtcd: initializes the etcd database
+//   - InitKafka: initializes the Kafka database
+//   - InitMySQL: initializes the MySQL database
+//   - InitNSQ: initializes the NSQ database
+//   - InitRedis: initializes the Redis database
 //
 // If any of the initialization functions return an error, this function will panic with the error.
 func MustInit(ctx context.Context) {
+	// Configure the standard logger
 	HookStd(ctx)
 
+	// Initialize the configuration
 	InitConfig(ctx)
 
-	service.InitCommon(ctx)
-
-	service.InitCron(ctx)
-
-	service.InitEnforcer(ctx)
-
-	service.InitES(ctx)
-
-	service.InitEtcd(ctx)
-
-	service.InitKafka(ctx)
-
+	// Initialize the logger
 	service.InitLogger(ctx)
 
+	// Initialize the common resources
+	service.InitCommon(ctx)
+
+	// Initialize the cron scheduler
+	service.InitCron(ctx)
+
+	// Initialize the enforcer
+	service.InitEnforcer(ctx)
+
+	// Initialize the ElasticSearch database
+	service.InitES(ctx)
+
+	// Initialize the etcd database
+	service.InitEtcd(ctx)
+
+	// Initialize the Kafka database
+	service.InitKafka(ctx)
+
+	// Initialize the MySQL database
 	service.InitMySQL(ctx)
 
+	// Initialize the NSQ database
 	service.InitNSQ(ctx)
 
+	// Initialize the Redis database
 	service.InitRedis(ctx)
 
 	//TaskStart(ctx)

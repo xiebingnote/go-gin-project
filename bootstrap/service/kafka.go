@@ -14,10 +14,13 @@ import (
 
 // InitKafka initializes the Kafka client with the configuration specified in
 // the./conf/kafka.toml file.
-// It reads the configuration parameters required
-// to connect and authenticate with the Kafka cluster.
+//
+// It reads the configuration parameters required to connect and authenticate
+// with the Kafka cluster.
+//
 // The initialized Kafka client is stored as a singleton in the resource package
 // for use throughout the application.
+//
 // If the configuration file decoding fails, the function panics with an error.
 func InitKafka(_ context.Context) {
 	err := InitKafkaClient()
@@ -28,13 +31,14 @@ func InitKafka(_ context.Context) {
 
 // InitKafkaClient initializes the Kafka client with the configuration specified
 // in the./conf/kafka.toml file.
-// It reads the configuration parameters required
-// to connect and authenticate with the Kafka cluster.
-// The initialized Kafka
-// client is stored as a singleton in the resource package for use throughout the
-// application.
-// If the configuration file decoding fails, the function panics with
-// an error.
+//
+// It reads the configuration parameters required to connect and authenticate with
+// the Kafka cluster.
+//
+// The initialized Kafka client is stored as a singleton in the resource package for
+// use throughout the application.
+//
+// If the configuration file decoding fails, the function panics with an error.
 func InitKafkaClient() error {
 	cfg := config.KafkaConfig
 

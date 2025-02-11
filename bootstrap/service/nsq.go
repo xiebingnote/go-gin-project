@@ -118,6 +118,7 @@ func InitProducers() error {
 //
 // It sets up the consumer configuration with the maximum number of inflight
 // messages, maximum attempts, default requeue delay, and heartbeat interval.
+//
 // A new NSQ consumer is then created using the topic, channel, and configuration.
 //
 // If the consumer creation fails, the function returns an error.
