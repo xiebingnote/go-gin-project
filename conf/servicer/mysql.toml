@@ -1,5 +1,5 @@
 # Service的名字，必选
-Name = "test_mysql"
+Name = "mysql"
 
 ## 各种自定义的参数，会以 Option 的方式放到 Servicer 中，全部非必选
 # 连接超时
@@ -24,15 +24,28 @@ Name = "Random"
 Host = "127.0.0.1"
 Port = 3306
 
+# MySQL 配置
 [MySQL]
+# 连接配置
 Username = "root"
 Password = "123456"
+# 数据库配置
+# 数据库名
 DBName = "test"
+# 数据库驱动
 DBDriver = "mysql"
+# 每个 ip 的最大连接
 MaxOpenPerIP = 5
+# 每个 ip 的最大空闲连接
 MaxIdlePerIP = 5
-ConnMaxLifeTime = 5000 # 单位 ms
-SQLLogLen = -1    # 打印sql内容，为0不打印，-1 为全部
-SQLArgsLogLen = -1    # 打印sql参数内容，为0不打印，-1 为全部
-LogIDTransport = true # 是否sql注释传递logid
+# 连接最大生命周期
+# 单位 ms
+ConnMaxLifeTime = 5000
+# 打印sql内容，为0不打印，-1 为全部
+SQLLogLen = -1
+# 打印sql参数内容，为0不打印，-1 为全部
+SQLArgsLogLen = -1
+# 是否sql注释传递logid
+LogIDTransport = true
+# DSN Params
 DSNParams = "charset=utf8&timeout=90s&collation=utf8mb4_unicode_ci&parseTime=true&loc=Asia%2FShanghai"

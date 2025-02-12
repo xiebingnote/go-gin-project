@@ -1,21 +1,36 @@
 [PostgreSQL]
 # 连接配置
 Host = "127.0.0.1"
+# 端口
 Port = 5432
+# 用户名
 User = "root"
+# 密码
 PassWord = "123456"
+# 数据库
 DBName = "mydatabase"
+# SSL 模式
 SSLMode = "disable"
 
 # 连接池配置
 [PostgreSQL.Pool]
+# 最大连接
 MaxConns = 100
+# 最小空闲连接
 MinConns = 10
-MaxConnLifetime = "30m"
-MaxConnIdleTime = "5m"
-HealthCheckPeriod = "1m"
+# 最大连接生命周期
+# 单位：分钟
+MaxConnLifetime = 30
+# 最大空闲时间
+# 单位：分钟
+MaxConnIdleTime = 5
+# 检测周期
+# 单位：分钟
+HealthCheckPeriod = 30
 
 # 迁移配置
 [PostgreSQL.Migrations]
+# 迁移路径
 Path = "migrations"
+# 迁移表
 Table = "schema_migrations"

@@ -1,27 +1,28 @@
 package config
 
-import "time"
-
+// PostgresqlConfigEntry Postgresql config entry
 type PostgresqlConfigEntry struct {
-	Host       string           `toml:"Host"`
-	Port       int              `toml:"Port"`
-	User       string           `toml:"User"`
-	Password   string           `toml:"PassWord"`
-	DBName     string           `toml:"DBName"`
-	SSLMode    string           `toml:"SSLMode"`
-	Pool       PoolConfig       `toml:"Pool"`
-	Migrations MigrationsConfig `toml:"Migrations"`
+	Host       string           `toml:"Host"`       // host
+	Port       int              `toml:"Port"`       // port
+	User       string           `toml:"User"`       // username
+	Password   string           `toml:"PassWord"`   // password
+	DBName     string           `toml:"DBName"`     // dbname
+	SSLMode    string           `toml:"SSLMode"`    // ssl mode
+	Pool       PoolConfig       `toml:"Pool"`       // pool
+	Migrations MigrationsConfig `toml:"Migrations"` // migrations
 }
 
+// PoolConfig Pool config
 type PoolConfig struct {
-	MaxConns          int           `toml:"MaxConns"`
-	MinConns          int           `toml:"MinConns"`
-	MaxConnLifetime   time.Duration `toml:"MaxConnLifetime"`
-	MaxConnIdleTime   time.Duration `toml:"MaxConnIdleTime"`
-	HealthCheckPeriod time.Duration `toml:"HealthCheckPeriod"`
+	MaxConns          int `toml:"MaxConns"`          // max connections
+	MinConns          int `toml:"MinConns"`          // min connections
+	MaxConnLifetime   int `toml:"MaxConnLifetime"`   // max connection lifetime
+	MaxConnIdleTime   int `toml:"MaxConnIdleTime"`   // max connection idle time
+	HealthCheckPeriod int `toml:"HealthCheckPeriod"` // health check period
 }
 
+// MigrationsConfig Migrations config
 type MigrationsConfig struct {
-	Path  string `toml:"Path"`
-	Table string `toml:"Table"`
+	Path  string `toml:"Path"`  // migration path
+	Table string `toml:"Table"` // migration table
 }

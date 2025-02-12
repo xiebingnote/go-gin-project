@@ -8,15 +8,27 @@ NsqLookupdAddress = [
 
 # 生产者配置
 [NSQ.Producer]
-DialTimeout = "5s"  # 连接超时
-MaxAttempts = 3     # 最大重试次数
-Concurrency = 100    # 并发数
+# 连接超时
+# 单位：秒
+DialTimeout = 5
+# 最大重试次数
+MaxAttempts = 3
+# 并发数
+Concurrency = 100
 
 # 消费者配置
 [NSQ.Consumer]
+# 消息队列
 Topic = "test_topic"
+# 消费者分组
 Channel = "test_channel"
-MaxInFlight = 100 # 最大处理中的消息数
-MaxAttempts = 5     # 消息最大重试次数
-RequeueDelay = "30s" # 重试延迟
-HeartbeatInterval = "30s" # 心跳间隔
+# 最大处理中的消息数
+MaxInFlight = 100
+# 消息最大重试次数
+MaxAttempts = 5
+# 重试延迟
+# 单位：秒
+RequeueDelay = 30
+# 心跳间隔
+# 单位：秒
+HeartbeatInterval = 30

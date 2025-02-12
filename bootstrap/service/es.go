@@ -46,29 +46,37 @@ func InitES(_ context.Context) {
 //
 // If the client initialization fails, the function will panic with the error.
 func InitESClient() *elastic.Client {
-	// 使用连接池
-	// Use connect pool.
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			// MaxIdleConns: The maximum number of idle (keep-alive) connections across all hosts.
-			MaxIdleConns: config.ESConfig.ES.MaxIdleConns,
-			// MaxIdleConnsPerHost: The maximum number of idle (keep-alive) connections per-host.
-			MaxIdleConnsPerHost: config.ESConfig.ES.MaxIdleConnsPerHost,
-			// IdleConnTimeout: The time for which to keep an idle connection open waiting for a request.
-			IdleConnTimeout: time.Duration(config.ESConfig.ES.IdleConnTimeout) * time.Second,
-		},
+	// Set the maximum number of idle (keep-alive) connections across all hosts.
+	httpTransport := &http.Transport{
+		MaxIdleConns: config.ESConfig.ES.MaxIdleConns,
 	}
 
+	// Set the maximum number of idle (keep-alive) connections per-host.
+	httpTransport.MaxIdleConnsPerHost = config.ESConfig.ES.MaxIdleConnsPerHost
+
+	// Set the time for which to keep an idle connection open waiting for a request.
+	httpTransport.IdleConnTimeout = time.Duration(config.ESConfig.ES.IdleConnTimeout) * time.Second
+
+	// Create an HTTP client with the above transport.
+	httpClient := &http.Client{
+		Transport: httpTransport,
+	}
+
+	// Create a new ES client with the above client.
 	client, err := elastic.NewClient(
-		// SetURL: The Elasticsearch URL to use.
+		// Set the Elasticsearch URL to use.
 		elastic.SetURL(config.ESConfig.ES.Address...),
-		// SetBasicAuth: The basic authentication username and password to use when connecting to Elasticsearch.
+
+		// Set the basic authentication username and password to use when connecting to Elasticsearch.
 		elastic.SetBasicAuth(config.ESConfig.ES.Username, config.ESConfig.ES.Password),
-		// SetHttpClient: The HTTP client to use when connecting to Elasticsearch.
+
+		// Set the HTTP client to use when connecting to Elasticsearch.
 		elastic.SetHttpClient(httpClient),
-		// SetSniff: Whether to enable sniffing.
+
+		// Set whether to enable sniffing.
 		elastic.SetSniff(false),
-		// SetHealthcheck: Whether to enable health checking.
+
+		// Set whether to enable health checking.
 		elastic.SetHealthcheck(false),
 	)
 

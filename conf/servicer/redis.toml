@@ -1,10 +1,20 @@
 [Redis]
+# redis 配置
+# redis 地址
 Addr = "127.0.0.1:6379"
+# redis 密码
 Password = ""
+# redis 数据库
 DB = 0
+# 连接池配置
 PoolSize = 10
+# 连接池最小空闲连接
 MinIdleConns = 5
+# 重试次数
 MaxRetries = 3
+# 连接超时
 DialTimeout = 5000
+# 读超时
 ReadTimeout = 3000
+# 写超时
 WriteTimeout = 3000

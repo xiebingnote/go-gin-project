@@ -1,5 +1,6 @@
 package config
 
+// ESConfigEntry ElasticSearch configuration
 type ESConfigEntry struct {
 	ES struct {
 		Address             []string `toml:"address"`                // ElasticSearch address

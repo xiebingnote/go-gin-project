@@ -1,9 +1,16 @@
 [Etcd]
+# etcd 配置
 Endpoints = [
     "http://192.168.0.10:2379",
     "http://192.168.0.11:2379",
     "http://192.168.0.12:2379"
 ]
-DialTimeout = 5  # 单位：秒
+
+# 连接超时时间
+# 单位：秒
+DialTimeout = 5
+
+# 用户名
 UserName = "root"
+# 密码
 PassWord = "123456"
