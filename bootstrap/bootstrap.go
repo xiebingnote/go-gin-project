@@ -53,14 +53,17 @@ func MustInit(ctx context.Context) {
 	// Initialize the etcd database
 	service.InitEtcd(ctx)
 
-	// Initialize the Kafka database
+	// Initialize the Kafka
 	service.InitKafka(ctx)
 
 	// Initialize the MySQL database
 	service.InitMySQL(ctx)
 
-	// Initialize the NSQ database
+	// Initialize the NSQ
 	service.InitNSQ(ctx)
+
+	// Initialize the Postgresql
+	service.InitPostgresql(ctx)
 
 	// Initialize the Redis database
 	service.InitRedis(ctx)

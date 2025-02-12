@@ -36,6 +36,9 @@ var (
 	// NsqConsumer is the NSQ consumer
 	NsqConsumer *nsq.Consumer
 
+	// PostgresqlClient is the PostgreSQL client
+	PostgresqlClient *gorm.DB
+
 	// RedisClient is the Redis client
 	RedisClient *redis.Client
 
