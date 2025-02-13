@@ -3,10 +3,10 @@ package jwt
 import (
 	"net/http"
 
-	"project/library/middleware"
-	"project/library/resource"
-	resp "project/library/response"
-	"project/model/types"
+	"go-gin-project/library/middleware"
+	"go-gin-project/library/resource"
+	resp "go-gin-project/library/response"
+	"go-gin-project/model/types"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

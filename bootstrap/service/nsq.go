@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	libconfig "project/library/config"
-	"project/library/resource"
+	libconfig "go-gin-project/library/config"
+	"go-gin-project/library/resource"
 
 	"github.com/nsqio/go-nsq"
 )

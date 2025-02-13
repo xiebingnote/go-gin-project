@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"project/bootstrap"
-	"project/library/resource"
-	"project/pkg/shutdown"
-	"project/servers"
+	"go-gin-project/bootstrap"
+	"go-gin-project/library/resource"
+	"go-gin-project/pkg/shutdown"
+	"go-gin-project/servers"
 
 	"go.uber.org/zap"
 )

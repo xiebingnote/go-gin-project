@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"project/library/common"
-	"project/library/config"
+	"go-gin-project/library/common"
+	"go-gin-project/library/config"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

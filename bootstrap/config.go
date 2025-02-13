@@ -3,7 +3,7 @@ package bootstrap
 import (
 	"context"
 
-	"project/library/config"
+	"go-gin-project/library/config"
 
 	"github.com/BurntSushi/toml"
 )

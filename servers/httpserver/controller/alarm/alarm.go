@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"os"
 
-	"project/library/resource"
-	resp "project/library/response"
+	"go-gin-project/library/resource"
+	resp "go-gin-project/library/response"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

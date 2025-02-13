@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"project/library/config"
-	"project/library/resource"
+	"go-gin-project/library/config"
+	"go-gin-project/library/resource"
 
 	"github.com/olivere/elastic/v7"
 )

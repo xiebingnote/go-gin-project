@@ -1,4 +1,4 @@
-module project
+module go-gin-project
 
 go 1.23
 

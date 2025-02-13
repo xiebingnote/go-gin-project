@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"project/library/config"
-	"project/library/resource"
+	"go-gin-project/library/config"
+	"go-gin-project/library/resource"
 
 	"github.com/redis/go-redis/v9"
 )

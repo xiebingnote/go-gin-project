@@ -1,11 +1,11 @@
 package httpserver
 
 import (
-	"project/library/config"
-	"project/library/middleware"
-	"project/library/resource"
-	authcasbin "project/servers/httpserver/auth/casbin"
-	"project/servers/httpserver/auth/jwt"
+	"go-gin-project/library/config"
+	"go-gin-project/library/middleware"
+	"go-gin-project/library/resource"
+	authcasbin "go-gin-project/servers/httpserver/auth/casbin"
+	"go-gin-project/servers/httpserver/auth/jwt"
 
 	"github.com/gin-gonic/gin"
 )
@@ -34,12 +34,12 @@ func NewServer() *gin.Engine {
 	router.Use(middleware.MemoryLimiter(config.PublicRate))
 
 	// JWT Register the auth endpoints.
-	router.POST("/web/api/project/login", jwt.Login)
-	router.POST("/web/api/project/register", jwt.Register)
+	router.POST("/web/api/login", jwt.Login)
+	router.POST("/web/api/register", jwt.Register)
 
 	// Register the controllers with the gin.Engine.
 	// The controllers are registered at "/web/api/xxx/v1".
-	api := router.Group("/web/api/project")
+	api := router.Group("/web/api")
 	// Apply JWT authentication middleware to the API group.
 	api.Use(middleware.AuthMiddlewareJWT)
 
@@ -72,9 +72,9 @@ func NewServerCasbin() *gin.Engine {
 	// The "admin" role has access to all routes with any method.
 	resource.Enforcer.AddPolicy("admin", "/*", "*")
 	// The "user" role can perform GET requests on v1 endpoints.
-	resource.Enforcer.AddPolicy("user", "/web/api/project/v1/*", "GET")
+	resource.Enforcer.AddPolicy("user", "/web/api/v1/*", "GET")
 	// The "user" role can perform any method on v1 endpoints.
-	resource.Enforcer.AddPolicy("user", "/web/api/project/v1/*", "*")
+	resource.Enforcer.AddPolicy("user", "/web/api/v1/*", "*")
 	// Group "alice" under the "admin" role group.
 	resource.Enforcer.AddGroupingPolicy("alice", "admin")
 
@@ -85,11 +85,11 @@ func NewServerCasbin() *gin.Engine {
 	router.Use(middleware.MemoryLimiter(config.PublicRate))
 
 	// Register the authentication endpoints for login and registration.
-	router.POST("/web/api/project/v1/login", authcasbin.Login)
-	router.POST("/web/api/project/v1/register", authcasbin.Register)
+	router.POST("/web/api/v1/login", authcasbin.Login)
+	router.POST("/web/api/v1/register", authcasbin.Register)
 
 	// Create an API group for versioned routes and apply Casbin authorization middleware.
-	api := router.Group("/web/api/project")
+	api := router.Group("/web/api")
 
 	// Apply Casbin authorization middleware to the API group.
 	api.Use(middleware.AuthMiddlewareCasbin())

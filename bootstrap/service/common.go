@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"project/library/resource"
+	"go-gin-project/library/resource"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	cmap "github.com/orcaman/concurrent-map/v2"

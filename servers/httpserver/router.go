@@ -1,7 +1,7 @@
 package httpserver
 
 import (
-	"project/servers/httpserver/controller"
+	"go-gin-project/servers/httpserver/controller"
 
 	"github.com/gin-gonic/gin"
 )

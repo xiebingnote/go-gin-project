@@ -1,8 +1,8 @@
 package controller
 
 import (
-	"project/servers/httpserver/controller/alarm"
-	"project/servers/httpserver/controller/test"
+	"go-gin-project/servers/httpserver/controller/alarm"
+	"go-gin-project/servers/httpserver/controller/test"
 
 	"github.com/gin-gonic/gin"
 )

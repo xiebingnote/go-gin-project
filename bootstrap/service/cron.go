@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"project/library/resource"
+	"go-gin-project/library/resource"
 
 	"github.com/go-co-op/gocron/v2"
 )

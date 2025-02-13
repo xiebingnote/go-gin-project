@@ -3,7 +3,7 @@ package test
 import (
 	"net/http"
 
-	resp "project/library/response"
+	resp "go-gin-project/library/response"
 
 	"github.com/gin-gonic/gin"
 )

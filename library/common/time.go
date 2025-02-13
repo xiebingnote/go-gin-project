@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"project/library/resource"
+	"go-gin-project/library/resource"
 
 	"github.com/jinzhu/now"
 )

@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"project/library/config"
-	"project/library/resource"
+	"go-gin-project/library/config"
+	"go-gin-project/library/resource"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"

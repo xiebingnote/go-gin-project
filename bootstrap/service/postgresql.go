@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	"project/library/config"
-	"project/library/resource"
+	"go-gin-project/library/config"
+	"go-gin-project/library/resource"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

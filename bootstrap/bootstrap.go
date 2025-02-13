@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	"project/bootstrap/service"
-	"project/library/resource"
-	"project/pkg/logger"
+	"go-gin-project/bootstrap/service"
+	"go-gin-project/library/resource"
+	"go-gin-project/pkg/logger"
 )
 
 // MustInit initializes the necessary parts of the application.
@@ -41,32 +41,32 @@ func MustInit(ctx context.Context) {
 	// Initialize the common resources
 	service.InitCommon(ctx)
 
-	// Initialize the cron scheduler
-	service.InitCron(ctx)
-
-	// Initialize the enforcer
-	service.InitEnforcer(ctx)
-
-	// Initialize the ElasticSearch database
-	service.InitES(ctx)
-
-	// Initialize the etcd database
-	service.InitEtcd(ctx)
-
-	// Initialize the Kafka
-	service.InitKafka(ctx)
-
-	// Initialize the MySQL database
-	service.InitMySQL(ctx)
-
-	// Initialize the NSQ
-	service.InitNSQ(ctx)
-
-	// Initialize the Postgresql
-	service.InitPostgresql(ctx)
-
-	// Initialize the Redis database
-	service.InitRedis(ctx)
+	//// Initialize the cron scheduler
+	//service.InitCron(ctx)
+	//
+	//// Initialize the ElasticSearch database
+	//service.InitES(ctx)
+	//
+	//// Initialize the etcd database
+	//service.InitEtcd(ctx)
+	//
+	//// Initialize the Kafka
+	//service.InitKafka(ctx)
+	//
+	//// Initialize the MySQL database
+	//service.InitMySQL(ctx)
+	//
+	//// Initialize the enforcer
+	//service.InitEnforcer(ctx)
+	//
+	//// Initialize the NSQ
+	//service.InitNSQ(ctx)
+	//
+	//// Initialize the Postgresql
+	//service.InitPostgresql(ctx)
+	//
+	//// Initialize the Redis database
+	//service.InitRedis(ctx)
 
 	//TaskStart(ctx)
 }

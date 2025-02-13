@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"project/library/config"
-	"project/servers/httpserver"
+	"go-gin-project/library/config"
+	"go-gin-project/servers/httpserver"
 
 	"github.com/gin-gonic/gin"
 )

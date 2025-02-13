@@ -1,7 +1,7 @@
 package service
 
 import (
-	"project/model/dao"
+	"go-gin-project/model/dao"
 )
 
 var mysqlDB = dao.NewUserClient()
