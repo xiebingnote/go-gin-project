@@ -45,8 +45,8 @@ func InitPostgresqlClient() error {
 	// Construct the DSN (Data Source Name) for Postgresql connection
 	// The format is: host=<host> port=<port> user=<user> password=<password> dbname=<dbname> sslmode=<sslmode>
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		config.PostgresqlConfig.Host, config.PostgresqlConfig.Port, config.PostgresqlConfig.User, config.PostgresqlConfig.Password,
-		config.PostgresqlConfig.DBName, config.PostgresqlConfig.SSLMode)
+		config.PostgresqlConfig.Postgresql.Host, config.PostgresqlConfig.Postgresql.Port, config.PostgresqlConfig.Postgresql.User,
+		config.PostgresqlConfig.Postgresql.Password, config.PostgresqlConfig.Postgresql.DBName, config.PostgresqlConfig.Postgresql.SSLMode)
 
 	// Initialize GORM with the Postgresql DSN and custom logger
 	// The logger is configured with the Postgresql configuration

@@ -13,7 +13,7 @@ GroupID = "order-processor"
 Version = "3.5.1"
 
 # 高级配置
-[Kafka.Advanced]
+[Advanced]
 # 生产者最大重试次数
 ProducerMaxRetry = 3
 # 消费者会话超时（ms）

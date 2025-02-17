@@ -4,13 +4,12 @@ import (
 	"go-gin-project/model/dao"
 )
 
-var mysqlDB = dao.NewUserClient()
+var user = dao.NewUserClient()
 
 func CreateTb() error {
-	return mysqlDB.CreateTb()
+	return user.CreateTb()
 }
 
-func GetUserNameByID() {
-
-	return
+func GetUserNameByID(id string) (string, error) {
+	return user.GetUserNameByID(id)
 }

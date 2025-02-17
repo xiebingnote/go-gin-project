@@ -11,9 +11,9 @@ type KafkaConfigEntry struct {
 	} `toml:"Kafka"`
 
 	Advanced struct {
-		ProducerMaxRetry       int `toml:"ProducerMaxRetry"`       // 生产者最大重试次数，整数
-		ConsumerSessionTimeout int `toml:"ConsumerSessionTimeout"` // 消费者会话超时（ms），整数
-		HeartbeatInterval      int `toml:"HeartbeatInterval"`      // 心跳间隔（ms），整数
-		MaxProcessingTime      int `toml:"MaxProcessingTime"`      // 最大处理时间（ms），整数
+		ProducerMaxRetry       int   `toml:"ProducerMaxRetry"`       // 生产者最大重试次数，整数
+		ConsumerSessionTimeout int64 `toml:"ConsumerSessionTimeout"` // 消费者会话超时（ms），整数
+		HeartbeatInterval      int64 `toml:"HeartbeatInterval"`      // 心跳间隔（ms），整数
+		MaxProcessingTime      int64 `toml:"MaxProcessingTime"`      // 最大处理时间（ms），整数
 	} `toml:"Advanced"`
 }

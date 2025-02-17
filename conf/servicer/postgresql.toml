@@ -13,7 +13,7 @@ DBName = "mydatabase"
 SSLMode = "disable"
 
 # 连接池配置
-[PostgreSQL.Pool]
+[Pool]
 # 最大连接
 MaxConns = 100
 # 最小空闲连接
@@ -29,7 +29,7 @@ MaxConnIdleTime = 5
 HealthCheckPeriod = 30
 
 # 迁移配置
-[PostgreSQL.Migrations]
+[Migrations]
 # 迁移路径
 Path = "migrations"
 # 迁移表

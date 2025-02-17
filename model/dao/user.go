@@ -23,8 +23,8 @@ type User interface {
 }
 
 func (u *UserClient) CreateTb() error {
-	return nil
-	//return u.mysql.AutoMigrate(&types.TbUser{})
+	//return nil
+	return u.mysql.AutoMigrate(&types.TbUser{})
 }
 
 func (u *UserClient) GetUserNameByID(id string) (string, error) {

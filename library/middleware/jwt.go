@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,7 +21,7 @@ func AuthMiddlewareJWT(c *gin.Context) {
 	token := c.GetHeader("Authorization")
 	if token == "" {
 		// Abort the request if the token is missing
-		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
@@ -28,7 +29,7 @@ func AuthMiddlewareJWT(c *gin.Context) {
 	userID, err := verifyToken(token)
 	if err != nil {
 		// Abort the request if the token is invalid
-		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 

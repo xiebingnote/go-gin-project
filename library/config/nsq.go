@@ -5,9 +5,9 @@ import "time"
 // NsqConfigEntry NSQ config entry
 type NsqConfigEntry struct {
 	NSQ struct {
-		LookupdAddress []string       `toml:"LookupdAddress"` // NSQ lookupd address
-		Producer       ProducerConfig `toml:"Producer"`       // NSQ producer
-		Consumer       ConsumerConfig `toml:"Consumer"`       // NSQ consumer
+		LookupdAddress []string       `toml:"NsqLookupdAddress"` // NSQ lookupd address
+		Producer       ProducerConfig `toml:"Producer"`          // NSQ producer
+		Consumer       ConsumerConfig `toml:"Consumer"`          // NSQ consumer
 	} `toml:"NSQ"`
 }
 

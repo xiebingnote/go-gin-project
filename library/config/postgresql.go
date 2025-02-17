@@ -2,12 +2,14 @@ package config
 
 // PostgresqlConfigEntry Postgresql config entry
 type PostgresqlConfigEntry struct {
-	Host       string           `toml:"Host"`       // host
-	Port       int              `toml:"Port"`       // port
-	User       string           `toml:"User"`       // username
-	Password   string           `toml:"PassWord"`   // password
-	DBName     string           `toml:"DBName"`     // dbname
-	SSLMode    string           `toml:"SSLMode"`    // ssl mode
+	Postgresql struct {
+		Host     string `toml:"Host"`     // host
+		Port     int    `toml:"Port"`     // port
+		User     string `toml:"User"`     // username
+		Password string `toml:"PassWord"` // password
+		DBName   string `toml:"DBName"`   // dbname
+		SSLMode  string `toml:"SSLMode"`  // ssl mode
+	} `toml:"Postgresql"`
 	Pool       PoolConfig       `toml:"Pool"`       // pool
 	Migrations MigrationsConfig `toml:"Migrations"` // migrations
 }
