@@ -1,7 +1,11 @@
 [Kafka]
 # Kafka 配置
 # 集群地址
-Brokers = ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
+Brokers = [
+    "127.0.0.1:9092",
+    #    "kafka2:9092",
+    #    "kafka3:9092"
+]
 # 生产者配置
 ProducerTopic = "orders"
 # 消费者配置

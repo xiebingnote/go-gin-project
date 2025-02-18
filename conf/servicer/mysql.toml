@@ -48,4 +48,5 @@ SQLArgsLogLen = -1
 # 是否sql注释传递logid
 LogIDTransport = true
 # DSN Params
-DSNParams = "charset=utf8&timeout=90s&collation=utf8mb4_unicode_ci&parseTime=true&loc=Asia%2FShanghai"
+#DSNParams = "charset=utf8&timeout=90s&collation=utf8mb4_unicode_ci&parseTime=true&loc=Asia%2FShanghai"
+DSNParams = "charset=utf8&timeout=90s&parseTime=true&loc=Asia%2FShanghai"

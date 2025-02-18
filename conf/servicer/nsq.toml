@@ -1,9 +1,9 @@
 [NSQ]
 # NSQ 集群配置
 NsqLookupdAddress = [
-    "nsqlookupd1:4161",
-    "nsqlookupd2:4161",
-    "nsqlookupd3:4161"
+    "127.0.0.1:4161",
+#    "nsqlookupd2:4161",
+#    "nsqlookupd3:4161"
 ]
 
 # 生产者配置

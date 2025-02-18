@@ -62,7 +62,7 @@ func MustInit(ctx context.Context) {
 	//// Initialize the NSQ
 	//service.InitNSQ(ctx)
 	//
-	//// Initialize the Postgresql
+	//// Initialize the Postgresql database
 	//service.InitPostgresql(ctx)
 	//
 	//// Initialize the Redis database

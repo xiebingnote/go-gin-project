@@ -4,11 +4,11 @@ Host = "127.0.0.1"
 # 端口
 Port = 5432
 # 用户名
-User = "root"
+User = "postgres"
 # 密码
 PassWord = "123456"
 # 数据库
-DBName = "mydatabase"
+DBName = "test"
 # SSL 模式
 SSLMode = "disable"
 

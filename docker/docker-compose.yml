@@ -1,0 +1,112 @@
+# 安装执行命令： docker-compose -f docker-compose.yml up -d
+
+version: '3'
+services:
+  mysql:
+    container_name: mysql
+    restart: always
+    image: mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: test
+
+  postgresql:
+    container_name: postgresql
+    restart: always
+    image: bitnami/postgresql
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: test
+
+  mongodb:
+    container_name: mongodb
+    restart: always
+    image: mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: 123456
+      MONGO_INITDB_DATABASE: test
+
+  clickhouse:
+    container_name: clickhouse
+    restart: always
+    image: clickhouse
+    ports:
+      - "8123:8123"
+    environment:
+      CLICKHOUSE_USER: root
+      CLICKHOUSE_PASSWORD: 123456
+      CLICKHOUSE_DB: test
+
+  redis:
+    container_name: redis
+    restart: always
+    image: redis
+    ports:
+      - "6379:6379"
+
+  etcd:
+    container_name: etcd
+    restart: always
+    image: bitnami/etcd
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    environment:
+      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_ADVERTISE_CLIENT_URLS: "http://etcd:2379"
+
+  nsqlookupd:
+    container_name: nsqlookupd
+    restart: always
+    image: nsqio/nsq
+    command: /nsqlookupd
+    ports:
+      - "4160:4160"
+      - "4161:4161"
+  nsqd:
+    container_name: nsqd
+    restart: always
+    image: nsqio/nsq
+    command: /nsqd --lookupd-tcp-address=nsqlookupd:4160
+    depends_on:
+      - nsqlookupd
+    ports:
+      - "4150:4150"
+      - "4151:4151"
+  nsqadmin:
+    container_name: nsqadmin
+    restart: always
+    image: nsqio/nsq
+    command: /nsqadmin --lookupd-http-address=nsqlookupd:4161
+    depends_on:
+      - nsqlookupd
+    ports:
+      - "4171:4171"
+
+  zookeeper:
+    container_name: zookeeper
+    restart: always
+    image: bitnami/zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+
+  kafka:
+    container_name: kafka
+    restart: always
+    image: bitnami/kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_CFG_ADVERTISED_HOST_NAME: kafka
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
