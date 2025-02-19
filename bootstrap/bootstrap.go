@@ -23,6 +23,7 @@ import (
 //   - InitElasticSearch: initializes the ElasticSearch database
 //   - InitEtcd: initializes the etcd database
 //   - InitKafka: initializes the Kafka database
+//   - InitMongoDB: initializes the MongoDB database
 //   - InitMySQL: initializes the MySQL database
 //   - InitNSQ: initializes the NSQ database
 //   - InitPostgresql: initializes the Postgresql database
@@ -43,9 +44,9 @@ func MustInit(ctx context.Context) {
 	// Initialize the common resources
 	service.InitCommon(ctx)
 
-	// Initialize the ClickHouse
-	service.InitClickHouse(ctx)
-
+	//// Initialize the ClickHouse
+	//service.InitClickHouse(ctx)
+	//
 	//// Initialize the cron scheduler
 	//service.InitCron(ctx)
 	//
@@ -57,6 +58,9 @@ func MustInit(ctx context.Context) {
 	//
 	//// Initialize the Kafka
 	//service.InitKafka(ctx)
+	//
+	//// Initialize the MongoDB database
+	//service.InitMongoDB(ctx)
 	//
 	//// Initialize the MySQL database
 	//service.InitMySQL(ctx)
@@ -101,6 +105,7 @@ func HookStd(_ context.Context) {
 //
 //   - MySQL client
 //   - Postgresql client
+//   - MongoDB client
 //   - Redis client
 //   - ElasticSearch client
 //   - ClickHouse connection
@@ -122,6 +127,11 @@ func Close() error {
 
 	// Close the Postgresql client.
 	err = service.ClosePostgresql()
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	err = service.CloseMongoDB()
 	if err != nil {
 		errs = append(errs, err)
 	}

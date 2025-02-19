@@ -21,8 +21,8 @@ import (
 //
 // If the configuration file decoding fails, the function panics with an error.
 func InitClickHouse(_ context.Context) {
-	err := InitClickHouseClient()
-	if err != nil {
+	if err := InitClickHouseClient(); err != nil {
+		// The ClickHouse client cannot be initialized. Panic with the error message.
 		panic(err.Error())
 	}
 }

@@ -11,6 +11,7 @@ import (
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/redis/go-redis/v9"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -31,6 +32,8 @@ var (
 	// LoggerService is the logger
 	LoggerService *zap.Logger
 
+	MongoDBClient *mongo.Database
+
 	// MySQLClient is the MySQL client
 	MySQLClient *gorm.DB
 
@@ -40,7 +43,7 @@ var (
 	// NsqConsumer is the NSQ consumer
 	NsqConsumer *nsq.Consumer
 
-	// PostgresqlClient is the PostgreSQL client
+	// PostgresqlClient is the Postgresql client
 	PostgresqlClient *gorm.DB
 
 	// RedisClient is the Redis client

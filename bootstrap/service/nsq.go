@@ -18,8 +18,7 @@ import (
 // If the initialization fails, it panics with an error message.
 func InitNSQ(_ context.Context) {
 	// Attempt to initialize the NSQ client
-	err := InitNSQClient()
-	if err != nil {
+	if err := InitNSQClient(); err != nil {
 		// Panic if there is an error initializing the NSQ client
 		panic(err.Error())
 	}

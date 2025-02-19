@@ -21,8 +21,7 @@ import (
 //
 // If the connection cannot be established, it panics with an error message.
 func InitPostgresql(_ context.Context) {
-	err := InitPostgresqlClient()
-	if err != nil {
+	if err := InitPostgresqlClient(); err != nil {
 		// The Postgresql client cannot be initialized. Panic with the error message.
 		panic(err.Error())
 	}

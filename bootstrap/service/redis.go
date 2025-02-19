@@ -17,8 +17,7 @@ import (
 // initializes the Redis client using the configuration, and assigns the
 // client to the global RedisClient resource.
 func InitRedis(_ context.Context) {
-	err := InitRedisClient()
-	if err != nil {
+	if err := InitRedisClient(); err != nil {
 		// Panic if the Redis client cannot be initialized.
 		panic(err.Error())
 	}

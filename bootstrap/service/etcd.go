@@ -22,8 +22,7 @@ import (
 // If any error occurs during the initialization of the Etcd client, the
 // function will panic with the error message.
 func InitEtcd(_ context.Context) {
-	err := InitEtcdClient()
-	if err != nil {
+	if err := InitEtcdClient(); err != nil {
 		panic(err.Error())
 	}
 }

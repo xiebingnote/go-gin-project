@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -23,9 +24,10 @@ import (
 //
 // The function takes a context.Context parameter, but does not currently use it.
 func InitElasticSearch(_ context.Context) {
-
-	// Initialize the ElasticSearch client with the decoded configuration.
-	resource.ElasticSearchClient = InitElasticSearchClient()
+	if err := InitElasticSearchClient(); err != nil {
+		// The ElasticSearch client cannot be initialized. Panic with the error message.
+		panic(err.Error())
+	}
 }
 
 // InitElasticSearchClient initializes a new ElasticSearch client with connection pool.
@@ -45,7 +47,7 @@ func InitElasticSearch(_ context.Context) {
 // - SetHealthcheck: false
 //
 // If the client initialization fails, the function will panic with the error.
-func InitElasticSearchClient() *elastic.Client {
+func InitElasticSearchClient() error {
 	// Set the maximum number of idle (keep-alive) connections across all hosts.
 	httpTransport := &http.Transport{
 		MaxIdleConns: config.ElasticSearchConfig.ElasticSearch.MaxIdleConns,
@@ -79,14 +81,18 @@ func InitElasticSearchClient() *elastic.Client {
 		// Set whether to enable health checking.
 		elastic.SetHealthcheck(false),
 	)
-
-	// Panic if client initialization fails.
 	if err != nil {
-		panic(err.Error())
+		return fmt.Errorf("fail to init Elasticsearch Client, err: %v", err)
 	}
 
-	// Return the initialized Elasticsearch client.
-	return client
+	// Log a message to indicate a successful connection to Elasticsearch.
+	resource.LoggerService.Info("Successfully connected to Elasticsearch")
+
+	// Store the initialized Elasticsearch client in the resource package.
+	resource.ElasticSearchClient = client
+
+	// Return nil to indicate successful initialization.
+	return nil
 }
 
 // CloseElasticSearch closes the ElasticSearch client connection.

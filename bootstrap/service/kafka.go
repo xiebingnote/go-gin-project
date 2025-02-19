@@ -23,8 +23,7 @@ import (
 //
 // If the configuration file decoding fails, the function panics with an error.
 func InitKafka(_ context.Context) {
-	err := InitKafkaClient()
-	if err != nil {
+	if err := InitKafkaClient(); err != nil {
 		panic(err.Error())
 	}
 }

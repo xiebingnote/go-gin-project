@@ -22,8 +22,7 @@ import (
 // established, it panics with an error message.
 func InitMySQL(_ context.Context) {
 	// Attempt to initialize the MySQL client
-	err := InitMySQLClient()
-	if err != nil {
+	if err := InitMySQLClient(); err != nil {
 		// Panic if there is an error initializing the MySQL client
 		panic(err.Error())
 	}
