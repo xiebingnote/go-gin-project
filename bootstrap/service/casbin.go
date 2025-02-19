@@ -29,7 +29,7 @@ func InitEnforcer(_ context.Context) {
 	}
 
 	// Initialize the Casbin enforcer.
-	enforcer, err := casbin.NewEnforcer("./conf/servicer/casbin.conf", adapter)
+	enforcer, err := casbin.NewEnforcer("./conf/service/casbin.conf", adapter)
 	if err != nil {
 		// Panic if the enforcer initialization fails.
 		panic(err)

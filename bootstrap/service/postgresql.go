@@ -77,3 +77,38 @@ func InitPostgresqlClient() error {
 	resource.PostgresqlClient = db
 	return nil
 }
+
+// ClosePostgresql closes the Postgresql database connection.
+//
+// It attempts to retrieve the underlying SQL DB connection from the global
+// Postgresql client resource. If the connection is successfully retrieved, it is
+// closed. The function returns an error if the connection cannot be closed
+// or if there is an error retrieving the SQL DB object.
+//
+// Returns:
+//   - An error if there is an issue closing the connection or retrieving the
+//     SQL DB object.
+//   - nil if the Postgresql client is nil or the connection is closed successfully.
+func ClosePostgresql() error {
+	if resource.PostgresqlClient != nil {
+		// Retrieve the underlying SQL DB connection from GORM
+		// This is the same as calling resource.PostgresqlClient.DB()
+		sqlDB, err := resource.PostgresqlClient.DB()
+		if err != nil {
+
+			// Return an error if there is an issue getting the SQL DB object,
+			// This should not happen unless the resource has been tampered with
+			return fmt.Errorf("failed to get sql.DB: %w", err)
+		}
+
+		// Attempt to close the Postgresql connection
+		if err := sqlDB.Close(); err != nil {
+			// Return an error if closing the connection fails,
+			// This could happen if the connection is already closed
+			return fmt.Errorf("failed to close Postgresql connection: %w", err)
+		}
+	}
+
+	// Postgresql client is nil, no connection to close
+	return nil
+}

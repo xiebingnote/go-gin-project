@@ -1,0 +1,11 @@
+[ClickHouse]
+# 连接配置
+Host = "localhost"
+# 端口
+Port = 9000
+# 用户名
+UserName = "root"
+# 密码
+PassWord = "123456"
+# 数据库
+Database = "test"

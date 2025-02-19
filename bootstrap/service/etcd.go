@@ -48,7 +48,7 @@ func InitEtcdClient() error {
 	}
 
 	// Create the etcd client
-	cli, err := clientv3.New(clientConfig)
+	etcdClient, err := clientv3.New(clientConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create etcd client: %w", err)
 	}
@@ -56,12 +56,13 @@ func InitEtcdClient() error {
 	// Perform a connection health check
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if _, err = cli.Status(ctx, clientConfig.Endpoints[0]); err != nil {
+	if _, err = etcdClient.Status(ctx, clientConfig.Endpoints[0]); err != nil {
 		return fmt.Errorf("etcd health check failed: %w", err)
 	}
 
 	// Log successful initialization
 	resource.LoggerService.Info("Etcd client initialized successfully")
+	resource.EtcdClient = etcdClient
 
 	return nil
 }

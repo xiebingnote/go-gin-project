@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"database/sql"
 	"github.com/IBM/sarama"
 	"github.com/casbin/casbin/v2"
 	mapset "github.com/deckarep/golang-set/v2"
@@ -15,11 +16,14 @@ import (
 )
 
 var (
+	// ClickHouseClient is the ClickHouse client
+	ClickHouseClient *sql.DB
+
 	// Corn is the cron scheduler
 	Corn gocron.Scheduler
 
-	// ESClient is the Elasticsearch client
-	ESClient *elastic.Client
+	// ElasticSearchClient is the Elasticsearch client
+	ElasticSearchClient *elastic.Client
 
 	// EtcdClient is the etcd client
 	EtcdClient *clientv3.Client

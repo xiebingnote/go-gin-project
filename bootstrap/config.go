@@ -37,49 +37,55 @@ func InitConfig(_ context.Context) {
 		panic(err.Error())
 	}
 
+	// Load ClickHouse configuration
+	if _, err := toml.DecodeFile("./conf/service/clickhouse.toml", &config.ClickHouseConfig); err != nil {
+		// The server configuration file could not be decoded. Panic with the error message.
+		panic(err.Error())
+	}
+
 	// Load Elasticsearch configuration
-	if _, err := toml.DecodeFile("./conf/servicer/es.toml", &config.ESConfig); err != nil {
+	if _, err := toml.DecodeFile("./conf/service/elasticsearch.toml", &config.ElasticSearchConfig); err != nil {
 		// The Elasticsearch configuration file could not be decoded. Panic with the error message.
 		panic(err.Error())
 	}
 
-	if _, err := toml.DecodeFile("./conf/servicer/etcd.toml", &config.EtcdConfig); err != nil {
+	if _, err := toml.DecodeFile("./conf/service/etcd.toml", &config.EtcdConfig); err != nil {
 		// The etcd configuration file could not be decoded. Panic with the error message.
 		panic(err.Error())
 	}
 
 	// Load Kafka configuration
-	if _, err := toml.DecodeFile("./conf/servicer/kafka.toml", &config.KafkaConfig); err != nil {
+	if _, err := toml.DecodeFile("./conf/service/kafka.toml", &config.KafkaConfig); err != nil {
 		// The Kafka configuration file could not be decoded. Panic with the error message.
 		panic(err.Error())
 	}
 
 	// Load MongoDB configuration
-	if _, err := toml.DecodeFile("./conf/servicer/mongodb.toml", &config.MongoConfig); err != nil {
+	if _, err := toml.DecodeFile("./conf/service/mongodb.toml", &config.MongoConfig); err != nil {
 		// The MongoDB configuration file could not be decoded. Panic with the error message.
 		panic(err.Error())
 	}
 
 	// Load MySQL configuration
-	if _, err := toml.DecodeFile("./conf/servicer/mysql.toml", &config.MySQLConfig); err != nil {
+	if _, err := toml.DecodeFile("./conf/service/mysql.toml", &config.MySQLConfig); err != nil {
 		// The MySQL configuration file could not be decoded. Panic with the error message.
 		panic(err.Error())
 	}
 
 	// Load NSQ configuration
-	if _, err := toml.DecodeFile("./conf/servicer/nsq.toml", &config.NsqConfig); err != nil {
+	if _, err := toml.DecodeFile("./conf/service/nsq.toml", &config.NsqConfig); err != nil {
 		// The NSQ configuration file could not be decoded. Panic with the error message.
 		panic(err.Error())
 	}
 
 	// Load PostgresSQL configuration
-	if _, err := toml.DecodeFile("./conf/servicer/postgresql.toml", &config.PostgresqlConfig); err != nil {
+	if _, err := toml.DecodeFile("./conf/service/postgresql.toml", &config.PostgresqlConfig); err != nil {
 		// The PostgresSQL configuration file could not be decoded. Panic with the error message.
 		panic(err.Error())
 	}
 
 	// Load Redis configuration
-	if _, err := toml.DecodeFile("./conf/servicer/redis.toml", &config.RedisConfig); err != nil {
+	if _, err := toml.DecodeFile("./conf/service/redis.toml", &config.RedisConfig); err != nil {
 		// The Redis configuration file could not be decoded. Panic with the error message.
 		panic(err.Error())
 	}

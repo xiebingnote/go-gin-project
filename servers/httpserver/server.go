@@ -25,6 +25,9 @@ import (
 // request and response. The gin.Recovery middleware recovers from any panics
 // that occur during the handling of a request and logs the panic.
 func NewServer() *gin.Engine {
+	// Set the gin mode to release.
+	gin.SetMode(gin.ReleaseMode)
+
 	// Create a new gin.Engine with the default middleware.
 	// The default middleware consists of the gin.Logger and gin.Recovery
 	// middleware.

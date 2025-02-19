@@ -70,3 +70,24 @@ func InitRedisClient() error {
 	resource.RedisClient = RedisClient
 	return nil
 }
+
+// CloseRedis closes the Redis client connection.
+//
+// This function checks if the global RedisClient resource is initialized.
+// If it is, it attempts to close the client connection and returns an error
+// if the closure fails. If successful, it returns nil.
+//
+// Returns:
+//   - An error if the client close operation fails.
+//   - nil if the Redis client is nil or the connection is closed successfully.
+func CloseRedis() error {
+	if resource.RedisClient != nil {
+		// Attempt to close the Redis client connection
+		if err := resource.RedisClient.Close(); err != nil {
+			// Return an error if closing the connection fails
+			return fmt.Errorf("failed to close Redis connection: %w", err)
+		}
+	}
+	// Redis client is nil, no connection to close
+	return nil
+}

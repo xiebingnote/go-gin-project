@@ -1,8 +1,11 @@
 package config
 
 var (
-	// ESConfig ElasticSearch config entry
-	ESConfig *ESConfigEntry
+	// ClickHouseConfig ClickHouse config entry
+	ClickHouseConfig *ClickHouseConfigEntry
+
+	// ElasticSearchConfig ElasticSearch config entry
+	ElasticSearchConfig *ElasticSearchConfigEntry
 
 	// EtcdConfig etcd config entry
 	EtcdConfig *EtcdConfigEntry

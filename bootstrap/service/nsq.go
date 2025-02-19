@@ -156,7 +156,7 @@ func InitConsumer() error {
 //
 // It stops all the producers and the consumer by calling their respective Stop
 // methods.
-func CloseNsq() {
+func CloseNsq() error {
 	// Stop all the producers
 	for _, producer := range resource.NsqProducer {
 		producer.Stop()
@@ -172,4 +172,5 @@ func CloseNsq() {
 		resource.LoggerService.Info("NSQ consumer stopped")
 	}
 
+	return nil
 }
