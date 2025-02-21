@@ -3,4 +3,4 @@ Host = "127.0.0.1"
 Port = 27017
 UserName = "root"
 PassWord = "123456"
-DBName = "test"
+DBName = "admin"
