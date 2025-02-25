@@ -8,12 +8,12 @@ import (
 )
 
 type UserClient struct {
-	mysql *gorm.DB
+	db *gorm.DB
 }
 
 func NewUserClient() *UserClient {
 	return &UserClient{
-		mysql: resource.MySQLClient,
+		db: resource.MySQLClient,
 	}
 }
 
@@ -23,11 +23,12 @@ type User interface {
 }
 
 func (u *UserClient) CreateTb() error {
-	//return nil
-	return u.mysql.AutoMigrate(&types.TbUser{})
+
+	return u.db.Table("tb_user").AutoMigrate(&types.TbUser{})
 }
 
 func (u *UserClient) GetUserNameByID(id string) (string, error) {
-	err := u.mysql.Table("tb_user").Where("id = ?", id).Select("username").Find(&types.TbUser{}).Error
-	return types.TbUser{}.Username, err
+	var info types.TbUser
+	err := u.db.Table("tb_user").Where("id = ?", id).Select("username").Find(&info).Error
+	return info.Username, err
 }

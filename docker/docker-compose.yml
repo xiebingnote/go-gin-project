@@ -1,4 +1,6 @@
 # 安装执行命令： docker-compose -f docker-compose.yml up -d
+# 启动单个服务执行命令： docker-compose up -d servername
+# 卸载执行命令： docker-compose -f docker-compose.yml down
 
 version: '3'
 services:
@@ -129,3 +131,15 @@ services:
       KAFKA_BROKER_ID: 1
     depends_on:
       - zookeeper
+
+  manticore:
+    container_name: manticore
+    restart: always
+    image: manticoresearch/manticore
+    ports:
+      - "9306:9306"
+      - "9308:9308"
+    environment:
+      MANTICORE_USER: root
+      MANTICORE_PASSWORD: 123456
+      MANTICORE_DB: test

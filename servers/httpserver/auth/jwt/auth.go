@@ -2,6 +2,7 @@ package jwt
 
 import (
 	"net/http"
+	"time"
 
 	"go-gin-project/library/middleware"
 	"go-gin-project/library/resource"
@@ -30,6 +31,15 @@ func Register(c *gin.Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 
+	if username == "" || password == "" {
+		// Return an error response if the username or password is empty
+		c.AbortWithStatusJSON(
+			http.StatusBadRequest,
+			gin.H{"error": "Registration failed: Username and password are required"},
+		)
+		return
+	}
+
 	// Hash the password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -43,12 +53,14 @@ func Register(c *gin.Context) {
 
 	// Create a new user instance
 	user := types.TbUser{
-		Username: username,
-		Password: string(hashedPassword),
+		Username:  username,
+		Password:  string(hashedPassword),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
 	// Insert the user into the database
-	if result := resource.MySQLClient.Create(&user); result.Error != nil {
+	if result := resource.MySQLClient.Table("tb_user").Create(&user); result.Error != nil {
 		// Return an error response if the username already exists
 		c.AbortWithStatusJSON(
 			http.StatusConflict,
@@ -59,6 +71,11 @@ func Register(c *gin.Context) {
 
 	// Return a success response
 	c.Status(http.StatusCreated)
+}
+
+type LoginInfo struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 // Login handles user login by verifying the provided username and password,
@@ -78,20 +95,23 @@ func Register(c *gin.Context) {
 func Login(c *gin.Context) {
 	reqID := uuid.NewString()
 
-	// Extract form data for username and password
-	username := c.PostForm("username")
-	password := c.PostForm("password")
+	var login LoginInfo
+
+	if err := c.BindJSON(&login); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
 
 	// Query the user from the database
 	var user types.TbUser
-	if result := resource.MySQLClient.Where("username = ?", username).First(&user); result.Error != nil {
+	if result := resource.MySQLClient.Table("tb_user").Where("username = ?", login.Username).First(&user); result.Error != nil {
 		// Return an error response if the user does not exist
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
 	// Verify the password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(login.Password)); err != nil {
 		// Return an error response if the password is incorrect
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return

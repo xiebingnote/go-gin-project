@@ -2,6 +2,7 @@ package casbin
 
 import (
 	"net/http"
+	"time"
 
 	"go-gin-project/library/middleware"
 	"go-gin-project/library/resource"
@@ -50,9 +51,11 @@ func Register(c *gin.Context) {
 	}
 
 	user := types.TbUser{
-		Username: req.Username,
-		Password: string(hashedPassword),
-		Role:     req.Role,
+		Username:  req.Username,
+		Password:  string(hashedPassword),
+		Role:      req.Role,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
 	// Insert the user into the database

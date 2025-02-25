@@ -119,25 +119,8 @@ func HookStd(_ context.Context) {
 func Close() error {
 	var errs []error
 
-	// Close the MySQL client.
-	err := service.CloseMySQL()
-	if err != nil {
-		errs = append(errs, err)
-	}
-
-	// Close the Postgresql client.
-	err = service.ClosePostgresql()
-	if err != nil {
-		errs = append(errs, err)
-	}
-
-	err = service.CloseMongoDB()
-	if err != nil {
-		errs = append(errs, err)
-	}
-
-	// Close the Redis client.
-	err = service.CloseRedis()
+	// Close the ClickHouse connection.
+	err := service.CloseClickHouse()
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -148,8 +131,8 @@ func Close() error {
 		errs = append(errs, err)
 	}
 
-	// Close the ClickHouse connection.
-	err = service.CloseClickHouse()
+	// Close the etcd client.
+	err = service.CloseEtcd()
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -160,8 +143,32 @@ func Close() error {
 		errs = append(errs, err)
 	}
 
+	// Close the MongoDB client.
+	err = service.CloseMongoDB()
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	// Close the MySQL client.
+	err = service.CloseMySQL()
+	if err != nil {
+		errs = append(errs, err)
+	}
+
 	// Close the NSQ connections.
 	err = service.CloseNsq()
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	// Close the Postgresql client.
+	err = service.ClosePostgresql()
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	// Close the Redis client.
+	err = service.CloseRedis()
 	if err != nil {
 		errs = append(errs, err)
 	}
