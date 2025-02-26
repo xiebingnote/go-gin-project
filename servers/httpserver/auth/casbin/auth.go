@@ -2,16 +2,15 @@ package casbin
 
 import (
 	"net/http"
-	"time"
 
 	"go-gin-project/library/middleware"
 	"go-gin-project/library/resource"
 	resp "go-gin-project/library/response"
 	"go-gin-project/model/types"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // Register handles user registration by accepting a JSON request with a username, password, and role,
@@ -31,6 +30,7 @@ import (
 //   - Aborts with a 409 Conflict if the username already exists.
 //   - Responds with a 201 Created and a success message upon successful registration.
 func Register(c *gin.Context) {
+	reqID := uuid.NewString()
 	var req struct {
 		Username string `json:"username"` // Username chosen by the user
 		Password string `json:"password"` // Password chosen by the user
@@ -39,34 +39,37 @@ func Register(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		// Return an error response if the request body is invalid
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		resp.NewErrResp(c, http.StatusBadRequest, "Invalid request", reqID)
 		return
+	}
+
+	if req.Username == "" || req.Password == "" {
+		// Return an error response if the username or password is empty
+		resp.NewErrResp(c, http.StatusBadRequest, "Registration failed: Username and password are required", reqID)
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		// Return an error response if password hashing fails
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Registration failed"})
+		resp.NewErrResp(c, http.StatusInternalServerError, "Registration failed: Unable to hash password", reqID)
 		return
 	}
 
 	user := types.TbUser{
-		Username:  req.Username,
-		Password:  string(hashedPassword),
-		Role:      req.Role,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Username: req.Username,
+		Password: string(hashedPassword),
+		Role:     req.Role,
 	}
 
 	// Insert the user into the database
-	if result := resource.MySQLClient.Create(&user); result.Error != nil {
+	if result := resource.MySQLClient.Table("tb_user").Create(&user); result.Error != nil {
 		// Return an error response if the username already exists
-		c.JSON(http.StatusConflict, gin.H{"error": "Username already exists"})
+		resp.NewErrResp(c, http.StatusConflict, "Registration failed: Username already exists", reqID)
 		return
 	}
 
 	// Return a success response
-	c.JSON(http.StatusCreated, gin.H{"message": "User created"})
+	resp.NewOKResp(c, "User created", reqID)
 }
 
 // Login authenticates a user by validating the provided username and password,
@@ -96,22 +99,28 @@ func Login(c *gin.Context) {
 	// Bind the incoming JSON request to the struct and validate it
 	if err := c.ShouldBindJSON(&req); err != nil {
 		// Return an error response if the request body is invalid
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		resp.NewErrResp(c, http.StatusBadRequest, "Invalid request", reqID)
+		return
+	}
+
+	if req.Username == "" || req.Password == "" {
+		// Return an error response if the username or password is empty
+		resp.NewErrResp(c, http.StatusBadRequest, "Login failed: Username and password are required", reqID)
 		return
 	}
 
 	// Query the user from the database
 	var user types.TbUser
-	if result := resource.MySQLClient.Where("username = ?", req.Username).First(&user); result.Error != nil {
+	if result := resource.MySQLClient.Table("tb_user").Where("username = ?", req.Username).First(&user); result.Error != nil {
 		// Return an error response if the user does not exist
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		resp.NewErrResp(c, http.StatusUnauthorized, "Invalid credentials", reqID)
 		return
 	}
 
 	// Verify the password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		// Return an error response if the password is incorrect
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		resp.NewErrResp(c, http.StatusUnauthorized, "Invalid credentials", reqID)
 		return
 	}
 
@@ -119,10 +128,10 @@ func Login(c *gin.Context) {
 	token, err := middleware.GenerateTokenCasbin(user.ID, user.Role)
 	if err != nil {
 		// Return an error response if JWT token generation fails
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Login failed"})
+		resp.NewErrResp(c, http.StatusInternalServerError, err.Error(), reqID)
 		return
 	}
 
 	// Return the JWT token as a success response
-	c.JSON(http.StatusOK, resp.NewOKRestResp(token, reqID))
+	resp.NewOKResp(c, token, reqID)
 }

@@ -1,7 +1,6 @@
 package alarm
 
 import (
-	"net/http"
 	"os"
 
 	"go-gin-project/library/resource"
@@ -17,5 +16,5 @@ func List(c *gin.Context) {
 	//todo
 
 	resource.LoggerService.Info("Application started", zap.Int("pid", os.Getpid()))
-	c.JSON(http.StatusOK, resp.NewOKRestResp("test success", reqID))
+	resp.NewOKResp(c, "test", reqID)
 }

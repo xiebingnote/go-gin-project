@@ -10,15 +10,16 @@ import (
 	"strings"
 	"testing"
 
+	"go-gin-project/bootstrap/service"
+	"go-gin-project/library/config"
+
 	"github.com/BurntSushi/toml"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-	"go-gin-project/bootstrap/service"
-	"go-gin-project/library/config"
 )
 
-// init initializes the MySQL database connection before the tests are run.
+// Init initializes the MySQL database connection before the tests are run.
 //
 // It uses the toml.DecodeFile function to load the MySQL configuration from the
 // file located at ./conf/service/mysql.toml. If the file cannot be decoded, it

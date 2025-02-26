@@ -2,7 +2,6 @@ package jwt
 
 import (
 	"net/http"
-	"time"
 
 	"go-gin-project/library/middleware"
 	"go-gin-project/library/resource"
@@ -27,16 +26,14 @@ import (
 //   - Aborts with a 409 Conflict if the username already exists.
 //   - Returns a 201 Created response upon successful registration.
 func Register(c *gin.Context) {
+	reqID := uuid.NewString()
 	// Extract form data
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 
 	if username == "" || password == "" {
 		// Return an error response if the username or password is empty
-		c.AbortWithStatusJSON(
-			http.StatusBadRequest,
-			gin.H{"error": "Registration failed: Username and password are required"},
-		)
+		resp.NewErrResp(c, http.StatusBadRequest, "Registration failed: Username and password are required", reqID)
 		return
 	}
 
@@ -44,33 +41,25 @@ func Register(c *gin.Context) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		// Return an error response if password hashing fails
-		c.AbortWithStatusJSON(
-			http.StatusInternalServerError,
-			gin.H{"error": "Registration failed: Unable to hash password"},
-		)
+		resp.NewErrResp(c, http.StatusInternalServerError, "Registration failed: Unable to hash password", reqID)
 		return
 	}
 
 	// Create a new user instance
 	user := types.TbUser{
-		Username:  username,
-		Password:  string(hashedPassword),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Username: username,
+		Password: string(hashedPassword),
 	}
 
 	// Insert the user into the database
 	if result := resource.MySQLClient.Table("tb_user").Create(&user); result.Error != nil {
 		// Return an error response if the username already exists
-		c.AbortWithStatusJSON(
-			http.StatusConflict,
-			gin.H{"error": "Registration failed: Username already exists"},
-		)
+		resp.NewErrResp(c, http.StatusConflict, "Registration failed: Username already exists", reqID)
 		return
 	}
 
 	// Return a success response
-	c.Status(http.StatusCreated)
+	resp.NewOKResp(c, "User created", reqID)
 }
 
 type LoginInfo struct {
@@ -98,7 +87,7 @@ func Login(c *gin.Context) {
 	var login LoginInfo
 
 	if err := c.BindJSON(&login); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		resp.NewErrResp(c, http.StatusBadRequest, "Invalid request", reqID)
 		return
 	}
 
@@ -106,14 +95,14 @@ func Login(c *gin.Context) {
 	var user types.TbUser
 	if result := resource.MySQLClient.Table("tb_user").Where("username = ?", login.Username).First(&user); result.Error != nil {
 		// Return an error response if the user does not exist
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		resp.NewErrResp(c, http.StatusUnauthorized, "Invalid credentials", reqID)
 		return
 	}
 
 	// Verify the password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(login.Password)); err != nil {
 		// Return an error response if the password is incorrect
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		resp.NewErrResp(c, http.StatusUnauthorized, "Invalid credentials", reqID)
 		return
 	}
 
@@ -121,11 +110,11 @@ func Login(c *gin.Context) {
 	token, err := middleware.GenerateTokenJWT(user.ID)
 	if err != nil {
 		// Return an error response if JWT token generation fails
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Login failed"})
+		resp.NewErrResp(c, http.StatusInternalServerError, err.Error(), reqID)
 		return
 	}
 
 	// Return a success response with the JWT token
 	// Return the JWT token
-	c.JSON(http.StatusOK, resp.NewOKRestResp(token, reqID))
+	resp.NewOKResp(c, token, reqID)
 }

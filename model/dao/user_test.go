@@ -2,12 +2,14 @@ package dao
 
 import (
 	"context"
-	"github.com/BurntSushi/toml"
-	"go-gin-project/bootstrap/service"
-	"go-gin-project/library/config"
 	"os"
 	"strings"
 	"testing"
+
+	"go-gin-project/bootstrap/service"
+	"go-gin-project/library/config"
+
+	"github.com/BurntSushi/toml"
 )
 
 var userClient *UserClient
