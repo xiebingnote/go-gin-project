@@ -9,11 +9,13 @@ import (
 	"time"
 
 	"github.com/xiebingnote/go-gin-project/library/config"
+	"github.com/xiebingnote/go-gin-project/library/middleware"
 	resp "github.com/xiebingnote/go-gin-project/library/response"
 	"github.com/xiebingnote/go-gin-project/servers/httpserver"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Start initializes and starts both the main and admin HTTP servers.
@@ -131,18 +133,29 @@ func runServer(srv *http.Server, name string) error {
 // The returned handler registers the following endpoints:
 //   - /debug/pprof/ (via gin.WrapH(http.DefaultServeMux)): the pprof debug endpoints.
 //   - /metrics: a test endpoint that returns a 200 OK response with the text "Metrics endpoint".
+//   - /test: a test endpoint that returns a 200 OK response with a UUID.
+//
+// The handler also uses the Gin recovery middleware to recover from panics and return a 500 Internal Server Error response.
+// The middleware.PrometheusMiddleware is used to register the Prometheus metrics endpoint.
 func NewAdminServer() http.Handler {
 	// Create a new Gin router for handling admin routes.
 	router := gin.New()
 	// Use the Gin recovery middleware to recover from panics and return a 500 Internal Server Error response.
-	router.Use(gin.Recovery())
+	router.Use(gin.Recovery(), middleware.PrometheusMiddleware())
 
 	// Register the pprof debug endpoints using the default HTTP ServeMux.
+	// The pprof package provides the http.DefaultServeMux handler, which serves the pprof debug endpoints.
 	router.GET("/debug/pprof/", gin.WrapH(http.DefaultServeMux))
+	// The pprof package also provides a handler for the ":profile" endpoint.
+	// This endpoint serves the pprof profile data for the given profile name.
 	router.GET("/debug/pprof/:profile", gin.WrapH(http.DefaultServeMux))
 
-	// Register a test endpoint that returns a 200 OK response with the text "Metrics endpoint".
-	router.GET("/metrics", func(c *gin.Context) {
+	// Register the Prometheus metrics endpoint.
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
+
+	// Register a test endpoint that returns a 200 OK response with a UUID.
+	// This endpoint can be used to test the admin server.
+	router.GET("/test", func(c *gin.Context) {
 		// Respond with a 200-OK status and a message.
 		resp.NewOKResp(c, "Metrics endpoint", uuid.NewString())
 	})
