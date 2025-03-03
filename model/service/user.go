@@ -1,7 +1,7 @@
 package service
 
 import (
-	"go-gin-project/model/dao"
+	"github.com/xiebingnote/go-gin-project/model/dao"
 )
 
 var user = dao.NewUserClient()

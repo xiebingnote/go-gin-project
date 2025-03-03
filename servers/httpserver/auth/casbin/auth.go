@@ -3,10 +3,10 @@ package casbin
 import (
 	"net/http"
 
-	"go-gin-project/library/middleware"
-	"go-gin-project/library/resource"
-	resp "go-gin-project/library/response"
-	"go-gin-project/model/types"
+	"github.com/xiebingnote/go-gin-project/library/middleware"
+	"github.com/xiebingnote/go-gin-project/library/resource"
+	resp "github.com/xiebingnote/go-gin-project/library/response"
+	"github.com/xiebingnote/go-gin-project/model/types"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/gin-gonic/gin"

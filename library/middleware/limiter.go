@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"go-gin-project/library/resource"
+	"github.com/xiebingnote/go-gin-project/library/resource"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ulule/limiter/v3"

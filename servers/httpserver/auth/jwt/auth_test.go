@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"go-gin-project/bootstrap/service"
-	"go-gin-project/library/config"
+	"github.com/xiebingnote/go-gin-project/bootstrap/service"
+	"github.com/xiebingnote/go-gin-project/library/config"
 
 	"github.com/BurntSushi/toml"
 	"github.com/gin-gonic/gin"

@@ -8,9 +8,9 @@ import (
 	_ "net/http/pprof"
 	"time"
 
-	"go-gin-project/library/config"
-	resp "go-gin-project/library/response"
-	"go-gin-project/servers/httpserver"
+	"github.com/xiebingnote/go-gin-project/library/config"
+	resp "github.com/xiebingnote/go-gin-project/library/response"
+	"github.com/xiebingnote/go-gin-project/servers/httpserver"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

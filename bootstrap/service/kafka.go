@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	"go-gin-project/library/config"
-	"go-gin-project/library/resource"
+	"github.com/xiebingnote/go-gin-project/library/config"
+	"github.com/xiebingnote/go-gin-project/library/resource"
 
 	"github.com/IBM/sarama"
 )

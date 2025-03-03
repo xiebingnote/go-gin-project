@@ -3,8 +3,8 @@ package alarm
 import (
 	"os"
 
-	"go-gin-project/library/resource"
-	resp "go-gin-project/library/response"
+	"github.com/xiebingnote/go-gin-project/library/resource"
+	resp "github.com/xiebingnote/go-gin-project/library/response"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

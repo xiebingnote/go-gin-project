@@ -16,8 +16,8 @@ LogFileError = "error.log"
 MaxSize = 1000
 
 # MaxAge is the maximum number of days to retain old log files based on the timestamp
-# encoded in their filename. Note that a day is defined as 24 hour, regardless of
-# whether the calendar day has 24 hours.
+# encoded in their filename.
+# Note that a day is defined as hour 24, regardless of whether the calendar day has 24 hours.
 # It defaults to 30 days
 MaxAge = 30
 

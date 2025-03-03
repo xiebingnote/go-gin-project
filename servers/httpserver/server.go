@@ -1,11 +1,11 @@
 package httpserver
 
 import (
-	"go-gin-project/library/config"
-	"go-gin-project/library/middleware"
-	"go-gin-project/library/resource"
-	authcasbin "go-gin-project/servers/httpserver/auth/casbin"
-	"go-gin-project/servers/httpserver/auth/jwt"
+	"github.com/xiebingnote/go-gin-project/library/config"
+	"github.com/xiebingnote/go-gin-project/library/middleware"
+	"github.com/xiebingnote/go-gin-project/library/resource"
+	authcasbin "github.com/xiebingnote/go-gin-project/servers/httpserver/auth/casbin"
+	"github.com/xiebingnote/go-gin-project/servers/httpserver/auth/jwt"
 
 	"github.com/gin-gonic/gin"
 )

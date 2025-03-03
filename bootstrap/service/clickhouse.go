@@ -2,11 +2,12 @@ package service
 
 import (
 	"context"
-	"fmt"
-	"go-gin-project/library/config"
-	"go-gin-project/library/resource"
-
 	"database/sql"
+	"fmt"
+
+	"github.com/xiebingnote/go-gin-project/library/config"
+	"github.com/xiebingnote/go-gin-project/library/resource"
+	
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 )
 

@@ -1,4 +1,4 @@
-# go-gin-project
+# github.com/xiebingnote/go-gin-project
 
 基于 Gin 进行模块化设计的 API 框架，封装了常用的功能，包括消息队列，数据库等，使用简单，致力于进行快速的业务研发。
 

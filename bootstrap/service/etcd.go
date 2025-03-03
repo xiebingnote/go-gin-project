@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"go-gin-project/library/config"
-	"go-gin-project/library/resource"
+	"github.com/xiebingnote/go-gin-project/library/config"
+	"github.com/xiebingnote/go-gin-project/library/resource"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )

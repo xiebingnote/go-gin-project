@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 
-	"go-gin-project/bootstrap/service"
-	"go-gin-project/library/resource"
+	"github.com/xiebingnote/go-gin-project/bootstrap/service"
+	"github.com/xiebingnote/go-gin-project/library/resource"
 )
 
 // MustInit initializes the necessary parts of the application.

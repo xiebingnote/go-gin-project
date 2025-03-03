@@ -1,8 +1,8 @@
 package dao
 
 import (
-	"go-gin-project/library/resource"
-	"go-gin-project/model/types"
+	"github.com/xiebingnote/go-gin-project/library/resource"
+	"github.com/xiebingnote/go-gin-project/model/types"
 
 	"gorm.io/gorm"
 )

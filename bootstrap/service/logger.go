@@ -4,9 +4,9 @@ import (
 	"context"
 	"log"
 
-	"go-gin-project/library/config"
-	"go-gin-project/library/resource"
-	"go-gin-project/pkg/logger"
+	"github.com/xiebingnote/go-gin-project/library/config"
+	"github.com/xiebingnote/go-gin-project/library/resource"
+	"github.com/xiebingnote/go-gin-project/pkg/logger"
 )
 
 // InitLogger initializes the LoggerService with a production-ready logger.

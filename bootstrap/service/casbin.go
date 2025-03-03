@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"go-gin-project/library/resource"
+	"github.com/xiebingnote/go-gin-project/library/resource"
 
 	"github.com/casbin/casbin/v2"
 	gormadapter "github.com/casbin/gorm-adapter/v3"

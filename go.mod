@@ -1,4 +1,4 @@
-module go-gin-project
+module github.com/xiebingnote/go-gin-project
 
 go 1.23
 

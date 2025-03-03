@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"go-gin-project/library/config"
-	"go-gin-project/library/resource"
+	"github.com/xiebingnote/go-gin-project/library/config"
+	"github.com/xiebingnote/go-gin-project/library/resource"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
