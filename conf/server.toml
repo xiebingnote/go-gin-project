@@ -2,34 +2,33 @@
 
 # HTTPServer 的配置
 [HTTPServer]
-# 端口 port.Main 定义在 app.toml
+# 监听端口号
 Listen = "0.0.0.0:8080"
 
 # 读 Header + Body 超时时间，ms，可选配置，若不配置，或者为0，将不超时
 # 建议：内网API服务可以小一些；外网页面可大一些，避免弱网访问失败
 # 若遇到读取 request.Body 失败，和此参数有关
 # 请根据实际情况进行调整
-ReadTimeout = 100
+ReadTimeout = 1 # 1s
 
 # 写超时时间（从请求读取完开始计算），ms，可选配置
 # 应该配置成服务的最大允许时间
 # 若使用超时中间件，超时中间件对应的超时时间不应该大于该值
 # 若要使用 /debug/pprof 功能，请设置一个大于 30s 的值
 # 请根据实际情况进行调整
-WriteTimeout = 120000 # 120s
+WriteTimeout = 120 # 120s
 
 # 空闲等待超时时间，ms，可选配置，若为0，会使用 ReadTimeout
 # 当设置 keep-alives 开启时(HTTP Server 默认开启)，同一个 tcp 连接，读取下一个请求的等待时间
 # 若 client 出现 connection reset by peer，可能和此参数有关
 # 请根据实际情况进行调整
-IdleTimeout = 3000
+IdleTimeout = 3 # 3s
 
-# 提供应用的管理、分析类功能,建议在 BNS 的端口别名为 admin
+# 提供应用的管理、分析类功能
 # 如 /debug/pprof/、/debug/panel/、/metrics
-# 此端口一般只在内网使用，不得通过 BFE 发布到外网
+# 此端口一般只在内网使用
 [AdminServer]
-# 监听一个独立的端口
-# 端口 port.Admin 定义在 app.toml
+# 监听一个独立的端口号
 Listen = "0.0.0.0:8081"
 
 # 版本信息

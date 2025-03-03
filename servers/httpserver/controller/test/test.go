@@ -10,5 +10,4 @@ import (
 func Test(c *gin.Context) {
 	reqID := uuid.NewString()
 	resp.NewOKResp(c, "test", reqID)
-
 }

@@ -19,13 +19,13 @@
 11. 支持 Redis, Etcd 缓存数据库
 12. 支持 Kafka, NSQ 消息队列
 13. 支持 RESTful API 返回值规范
+14. 支持 pprof 性能剖析
 
 ### 待添加完善组件：
 
 1. 支持 TDengine 时序数据库
 2. 支持 Prometheus 指标记录
-3. 支持 pprof 性能剖析
-4. 支持 manticore search 搜索引擎
+3. 支持 manticore search 搜索引擎
 
 
 ## 架构图：

@@ -5,11 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
+	"time"
 
 	"go-gin-project/library/config"
+	resp "go-gin-project/library/response"
 	"go-gin-project/servers/httpserver"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // Start initializes and starts both the main and admin HTTP servers.
@@ -70,11 +74,11 @@ func Start(_ context.Context) (mainSrv *http.Server, adminSrv *http.Server, errC
 //   - A pointer to one http.Server configured for the main interface.
 func newMainServer(cfg *config.ServerConfigEntry, handler http.Handler) *http.Server {
 	return &http.Server{
-		Addr:         cfg.HTTPServer.Listen,       // Listen to the address for the main server.
-		Handler:      handler,                     // HTTP handler for the main routes.
-		ReadTimeout:  cfg.HTTPServer.ReadTimeout,  // Read timeout for incoming requests.
-		WriteTimeout: cfg.HTTPServer.WriteTimeout, // Write timeout for outgoing responses.
-		IdleTimeout:  cfg.HTTPServer.IdleTimeout,  // Idle timeout for keep-alive connections.
+		Addr:         cfg.HTTPServer.Listen,                     // Listen to the address for the main server.
+		Handler:      handler,                                   // HTTP handler for the main routes.
+		ReadTimeout:  cfg.HTTPServer.ReadTimeout * time.Second,  // Read timeout for incoming requests.
+		WriteTimeout: cfg.HTTPServer.WriteTimeout * time.Second, // Write timeout for outgoing responses.
+		IdleTimeout:  cfg.HTTPServer.IdleTimeout * time.Second,  // Idle timeout for keep-alive connections.
 	}
 }
 
@@ -93,11 +97,11 @@ func newMainServer(cfg *config.ServerConfigEntry, handler http.Handler) *http.Se
 func newAdminServer(cfg *config.ServerConfigEntry, handler http.Handler) *http.Server {
 	// Create a new HTTP server with the given configuration.
 	return &http.Server{
-		Addr:         cfg.AdminServer.Listen,      // Listen to the address for the admin server.
-		Handler:      handler,                     // HTTP handler for the admin routes.
-		ReadTimeout:  cfg.HTTPServer.ReadTimeout,  // Read timeout for incoming requests.
-		WriteTimeout: cfg.HTTPServer.WriteTimeout, // Write timeout for outgoing responses.
-		IdleTimeout:  cfg.HTTPServer.IdleTimeout,  // Idle timeout for keep-alive connections.
+		Addr:         cfg.AdminServer.Listen,                    // Listen to the address for the admin server.
+		Handler:      handler,                                   // HTTP handler for the admin routes.
+		ReadTimeout:  cfg.HTTPServer.ReadTimeout * time.Second,  // Read timeout for incoming requests.
+		WriteTimeout: cfg.HTTPServer.WriteTimeout * time.Second, // Write timeout for outgoing responses.
+		IdleTimeout:  cfg.HTTPServer.IdleTimeout * time.Second,  // Idle timeout for keep-alive connections.
 	}
 }
 
@@ -130,14 +134,17 @@ func runServer(srv *http.Server, name string) error {
 func NewAdminServer() http.Handler {
 	// Create a new Gin router for handling admin routes.
 	router := gin.New()
+	// Use the Gin recovery middleware to recover from panics and return a 500 Internal Server Error response.
+	router.Use(gin.Recovery())
 
 	// Register the pprof debug endpoints using the default HTTP ServeMux.
 	router.GET("/debug/pprof/", gin.WrapH(http.DefaultServeMux))
+	router.GET("/debug/pprof/:profile", gin.WrapH(http.DefaultServeMux))
 
 	// Register a test endpoint that returns a 200 OK response with the text "Metrics endpoint".
 	router.GET("/metrics", func(c *gin.Context) {
 		// Respond with a 200-OK status and a message.
-		c.String(http.StatusOK, "Metrics endpoint")
+		resp.NewOKResp(c, "Metrics endpoint", uuid.NewString())
 	})
 
 	// Return the configured Gin router as the admin HTTP handler.
