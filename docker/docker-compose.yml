@@ -132,14 +132,60 @@ services:
     depends_on:
       - zookeeper
 
+  # manticore 默认没有用户密码，需自行创建
   manticore:
     container_name: manticore
     restart: always
     image: manticoresearch/manticore
     ports:
+      # mysql 兼容端口
       - "9306:9306"
+      # HTTP API 端口
       - "9308:9308"
+      # 集群端口
+      - "9312:9312"
+    volumes:
+      # 挂载初始化 SQL
+      - ./manticore-init.sql:/docker-entrypoint-initdb.d/init.sql
     environment:
-      MANTICORE_USER: root
-      MANTICORE_PASSWORD: 123456
-      MANTICORE_DB: test
+      - EXTRA=1
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 65535
+        hard: 65535
+      memlock:
+        soft: -1
+        hard: -1
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.2
+    container_name: elasticsearch
+    restart: always
+    environment:
+      - node.name=es01
+      - cluster.name=es-cluster
+      - discovery.type=single-node  # 单节点模式（开发环境）
+      - bootstrap.memory_lock=true  # 锁定内存，防止 OOM
+      - xpack.security.enabled=true  # 开启安全认证（账号密码）
+      - ELASTIC_PASSWORD=123456  # elastic 用户的密码
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.17.2
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=123456
+    depends_on:
+      - elasticsearch
+    restart: always

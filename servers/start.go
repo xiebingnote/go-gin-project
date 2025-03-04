@@ -157,7 +157,7 @@ func NewAdminServer() http.Handler {
 	// This endpoint can be used to test the admin server.
 	router.GET("/test", func(c *gin.Context) {
 		// Respond with a 200-OK status and a message.
-		resp.NewOKResp(c, "Metrics endpoint", uuid.NewString())
+		resp.NewOKResp(c, "Metrics endpoint test", uuid.NewString())
 	})
 
 	// Return the configured Gin router as the admin HTTP handler.

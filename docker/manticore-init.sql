@@ -1,0 +1,5 @@
+ALTER
+    USER 'root'@'%' IDENTIFIED BY '123456';
+FLUSH
+    PRIVILEGES;
+
