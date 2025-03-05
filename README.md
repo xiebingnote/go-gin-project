@@ -21,11 +21,12 @@
 13. 支持 RESTful API 返回值规范
 14. 支持 pprof 性能剖析
 15. 支持 Prometheus 指标记录
+16. 支持 manticore search 搜索引擎
 
-### 待添加完善组件：
+### 待添加完善：
 
 1. 支持 TDengine 时序数据库
-2. 支持 manticore search 搜索引擎
+2. 各组件 Prometheus 监控指标
 
 
 ## 架构图：
