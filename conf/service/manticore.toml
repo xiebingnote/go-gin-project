@@ -1,0 +1,12 @@
+# Manticore Config
+[Manticore]
+# Manticore endpoints
+Endpoints = [
+    "127.0.0.1"
+]
+# Manticore Port
+Port = 9308
+# Manticore UserName
+UserName = "root"
+# Manticore PassWord
+PassWord = "123456"

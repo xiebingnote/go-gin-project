@@ -86,7 +86,7 @@ func InitElasticSearchClient() error {
 	}
 
 	// Log a message to indicate a successful connection to Elasticsearch.
-	resource.LoggerService.Info("Successfully connected to Elasticsearch")
+	resource.LoggerService.Info(fmt.Sprintf("Successfully connected to Elasticsearch"))
 
 	// Store the initialized Elasticsearch client in the resource package.
 	resource.ElasticSearchClient = client

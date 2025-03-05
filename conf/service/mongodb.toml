@@ -1,6 +1,13 @@
+# MongoDB connection configuration
 [MongoDB]
+# MongoDB connection parameters
+# Host: MongoDB server host
 Host = "127.0.0.1"
+# Port: MongoDB server port
 Port = 27017
+# UserName: MongoDB user name
+# PassWord: MongoDB password
 UserName = "root"
 PassWord = "123456"
+# DBName: MongoDB database name
 DBName = "admin"

@@ -2,12 +2,15 @@ package shutdown
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/xiebingnote/go-gin-project/library/resource"
 )
 
 var _ Hook = (*hook)(nil)
@@ -86,7 +89,8 @@ func (h *hook) WithSignals(signals ...syscall.Signal) Hook {
 func (h *hook) Close(funcs ...func()) {
 	// Receive the signal that triggered the shutdown
 	sig := <-h.signalChan
-	log.Printf("🛑 Received signal: %s", sig)
+	log.Printf(fmt.Sprintf("🛑 Received signal: %s", sig))
+	resource.LoggerService.Info(fmt.Sprintf("🛑 Received signal: %s", sig))
 
 	// Stop listening for signals to prevent the program from exiting
 	// immediately
@@ -117,9 +121,9 @@ func (h *hook) Close(funcs ...func()) {
 			// Wait for the cleanup task to complete or timeout
 			select {
 			case <-done:
-				log.Println("✅ Cleanup task completed")
 			case <-taskCtx.Done():
-				log.Println("⏰ Cleanup task timeout")
+				log.Println(fmt.Sprintf("⏰ Cleanup task timeout"))
+				resource.LoggerService.Error(fmt.Sprintf("⏰ Cleanup task timeout"))
 			}
 		}(f)
 	}
@@ -131,10 +135,13 @@ func (h *hook) Close(funcs ...func()) {
 		close(done)
 	}()
 
+	// Wait for all cleanup tasks to complete or the total timeout to be reached
 	select {
 	case <-done:
-		log.Println("🎉 All cleanup tasks completed")
+		log.Println(fmt.Sprintf("🎉 All cleanup tasks completed"))
+		resource.LoggerService.Info(fmt.Sprintf("🎉 All cleanup tasks completed"))
 	case <-shutdownCtx.Done():
-		log.Println("⏰ Shutdown timeout, force exit")
+		log.Println(fmt.Sprintf("⏰ Shutdown timeout, force exit"))
+		resource.LoggerService.Error(fmt.Sprintf("⏰ Shutdown timeout, force exit"))
 	}
 }

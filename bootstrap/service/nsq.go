@@ -37,7 +37,7 @@ func InitNSQ(_ context.Context) {
 // If either of these functions fails, it logs an error and returns the error.
 func InitNSQClient() error {
 	if len(libconfig.NsqConfig.NSQ.LookupdAddress) == 0 {
-		resource.LoggerService.Error("NSQLookupdAddress are nil")
+		resource.LoggerService.Error(fmt.Sprintf("NSQLookupdAddress are nil"))
 		return fmt.Errorf("NSQLookupdAddress are nil")
 	}
 
@@ -79,31 +79,15 @@ func InitProducers() error {
 		producer, err := nsq.NewProducer(addr, config)
 		if err != nil {
 			// Log an error if the producer fails to be created.
-			resource.LoggerService.Error(fmt.Sprintf(
-				"failed to create producer for address %s, err: %v",
-				addr,
-				err,
-			))
-			return fmt.Errorf(
-				"failed to create producer for address %s: %w",
-				addr,
-				err,
-			)
+			resource.LoggerService.Error(fmt.Sprintf("failed to create producer for address %s, err: %v", addr, err))
+			return fmt.Errorf("failed to create producer for address %s: %w", addr, err)
 		}
 
 		// Test the connection by sending a ping to the producer.
 		if err := producer.Ping(); err != nil {
 			// Log an error if the ping fails.
-			resource.LoggerService.Error(fmt.Sprintf(
-				"producer ping failed for address %s, err: %v",
-				addr,
-				err,
-			))
-			return fmt.Errorf(
-				"producer ping failed for address %s: %w",
-				addr,
-				err,
-			)
+			resource.LoggerService.Error(fmt.Sprintf("producer ping failed for address %s, err: %v", addr, err))
+			return fmt.Errorf("producer ping failed for address %s: %w", addr, err)
 		}
 
 		// Add the producer to the list of producers.
@@ -161,14 +145,11 @@ func CloseNsq() error {
 		producer.Stop()
 	}
 
-	// Log that all the producers have been stopped
-	resource.LoggerService.Info("All NSQ producer stopped")
-
 	// Stop the consumer
 	if resource.NsqConsumer != nil {
 		resource.NsqConsumer.Stop()
 		// Log that the consumer has been stopped
-		resource.LoggerService.Info("NSQ consumer stopped")
+		resource.LoggerService.Info(fmt.Sprintf("NSQ consumer stopped"))
 	}
 
 	return nil

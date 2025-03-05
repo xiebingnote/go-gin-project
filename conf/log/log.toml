@@ -3,7 +3,7 @@
 DefaultLevel = "info"
 
 # log directory
-LogDir = "/var/log"
+LogDir = "./log"
 
 # log file name
 LogFileDebug = "debug.log"

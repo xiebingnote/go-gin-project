@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/xiebingnote/go-gin-project/library/middleware"
@@ -33,6 +34,7 @@ func Register(c *gin.Context) {
 
 	if username == "" || password == "" {
 		// Return an error response if the username or password is empty
+		resource.LoggerService.Error(fmt.Sprintf("Registration failed: Username and password are required"))
 		resp.NewErrResp(c, http.StatusBadRequest, "Registration failed: Username and password are required", reqID)
 		return
 	}
@@ -41,6 +43,7 @@ func Register(c *gin.Context) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		// Return an error response if password hashing fails
+		resource.LoggerService.Error(fmt.Sprintf("Registration failed: Unable to hash password"))
 		resp.NewErrResp(c, http.StatusInternalServerError, "Registration failed: Unable to hash password", reqID)
 		return
 	}
@@ -54,6 +57,7 @@ func Register(c *gin.Context) {
 	// Insert the user into the database
 	if result := resource.MySQLClient.Table("tb_user").Create(&user); result.Error != nil {
 		// Return an error response if the username already exists
+		resource.LoggerService.Error(fmt.Sprintf("Registration failed: Username already exists"))
 		resp.NewErrResp(c, http.StatusConflict, "Registration failed: Username already exists", reqID)
 		return
 	}
@@ -87,6 +91,7 @@ func Login(c *gin.Context) {
 	var login LoginInfo
 
 	if err := c.BindJSON(&login); err != nil {
+		resource.LoggerService.Error(fmt.Sprintf("Invalid request: %v", err))
 		resp.NewErrResp(c, http.StatusBadRequest, "Invalid request", reqID)
 		return
 	}
@@ -95,6 +100,7 @@ func Login(c *gin.Context) {
 	var user types.TbUser
 	if result := resource.MySQLClient.Table("tb_user").Where("username = ?", login.Username).First(&user); result.Error != nil {
 		// Return an error response if the user does not exist
+		resource.LoggerService.Error(fmt.Sprintf("Login failed: Invalid credentials"))
 		resp.NewErrResp(c, http.StatusUnauthorized, "Invalid credentials", reqID)
 		return
 	}
@@ -102,6 +108,7 @@ func Login(c *gin.Context) {
 	// Verify the password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(login.Password)); err != nil {
 		// Return an error response if the password is incorrect
+		resource.LoggerService.Error(fmt.Sprintf("Login failed: Invalid credentials"))
 		resp.NewErrResp(c, http.StatusUnauthorized, "Invalid credentials", reqID)
 		return
 	}
@@ -110,6 +117,7 @@ func Login(c *gin.Context) {
 	token, err := middleware.GenerateTokenJWT(user.ID)
 	if err != nil {
 		// Return an error response if JWT token generation fails
+		resource.LoggerService.Error(fmt.Sprintf("Login failed: %v", err))
 		resp.NewErrResp(c, http.StatusInternalServerError, err.Error(), reqID)
 		return
 	}

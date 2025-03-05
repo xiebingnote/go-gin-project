@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/xiebingnote/go-gin-project/library/config"
@@ -78,7 +77,7 @@ func InitKafkaClient() error {
 	// Start a background health check
 	go kafkaHealthCheck(context.Background())
 
-	log.Printf("Kafka initialized | Brokers: %v | Version: %s", cfg.Kafka.Brokers, cfg.Kafka.Version)
+	resource.LoggerService.Info(fmt.Sprintf("Kafka initialized | Brokers: %v | Version: %s", cfg.Kafka.Brokers, cfg.Kafka.Version))
 	return nil
 }
 
@@ -131,15 +130,16 @@ func kafkaHealthCheck(ctx context.Context) {
 					Topic: "health_check_topic",
 					Value: sarama.StringEncoder("ping"),
 				}); err != nil {
-					log.Printf("Kafka producer health check failed: %v", err)
+					resource.LoggerService.Error(fmt.Sprintf("K))afka producer health check failed: %v", err))
+					return
 				} else {
-					log.Println("Kafka producer is healthy")
+					resource.LoggerService.Info(fmt.Sprintf("Kafka producer health check succeeded"))
 				}
 			}
 
 			// Check the health of the Kafka consumer
 			if resource.KafkaConsumer != nil {
-				log.Println("Kafka consumer is running")
+				resource.LoggerService.Info(fmt.Sprintf("Kafka consumer is running"))
 			}
 
 		case <-ctx.Done():
@@ -182,9 +182,9 @@ func (h *KafkaConsumerHandler) ConsumeClaim(
 	// Iterate over the messages in the partition
 	for message := range claim.Messages() {
 		// Log the message
-		log.Printf("Message received: Topic=%s Partition=%d Offset=%d Key=%s Value=%s",
+		resource.LoggerService.Info(fmt.Sprintf("Message received: Topic=%s Partition=%d Offset=%d Key=%s Value=%s",
 			message.Topic, message.Partition, message.Offset,
-			string(message.Key), string(message.Value))
+			string(message.Key), string(message.Value)))
 
 		// Mark the message as processed
 		session.MarkMessage(message, "")
@@ -205,12 +205,13 @@ func StartKafkaConsumer(topics []string) {
 		for {
 			// Consume messages from the specified topics
 			if err := resource.KafkaConsumer.Consume(context.Background(), topics, handler); err != nil {
-				log.Printf("Consumer error: %v", err)
+				resource.LoggerService.Error(fmt.Sprintf("Kafka consumer error: %v", err))
+				return
 			}
 		}
 	}()
 
 	// Wait until the consumer is ready
 	<-handler.Ready
-	log.Println("Kafka consumer up and running...")
+	resource.LoggerService.Info(fmt.Sprintf("Kafka consumer is ready"))
 }

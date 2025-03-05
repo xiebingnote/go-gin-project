@@ -56,6 +56,7 @@ func InitMySQLClient() error {
 		Logger: newGormLogger(cfg),
 	})
 	if err != nil {
+		resource.LoggerService.Error(fmt.Sprintf("gorm open failed: %v", err))
 		return fmt.Errorf("gorm open failed: %w", err)
 	}
 
@@ -63,6 +64,7 @@ func InitMySQLClient() error {
 	// The connection pool settings are configured with the MySQL configuration
 	sqlDB, err := db.DB()
 	if err != nil {
+		resource.LoggerService.Error(fmt.Sprintf("get sql.DB failed: %v", err))
 		return fmt.Errorf("get sql.DB failed: %w", err)
 	}
 
@@ -127,12 +129,14 @@ func CloseMySQL() error {
 		sqlDB, err := resource.MySQLClient.DB()
 		if err != nil {
 			// Return an error if there is an issue getting the SQL DB object
+			resource.LoggerService.Error(fmt.Sprintf("failed to get sql.DB: %v", err))
 			return fmt.Errorf("failed to get sql.DB: %w", err)
 		}
 
 		// Attempt to close the MySQL connection
 		if err := sqlDB.Close(); err != nil {
 			// Return an error if closing the connection fails
+			resource.LoggerService.Error(fmt.Sprintf("failed to close MySQL connection: %v", err))
 			return fmt.Errorf("failed to close MySQL connection: %w", err)
 		}
 	}

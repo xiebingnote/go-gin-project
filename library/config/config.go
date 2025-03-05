@@ -16,6 +16,9 @@ var (
 	// LogConfig log config entry
 	LogConfig *LogConfigEntry
 
+	// ManticoreConfig manticore config entry
+	ManticoreConfig *ManticoreConfigEntry
+
 	// MongoConfig mongodb config entry
 	MongoConfig *MongoDBConfigEntry
 

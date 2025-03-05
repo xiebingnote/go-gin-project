@@ -60,7 +60,7 @@ func InitEtcdClient() error {
 	}
 
 	// Log successful initialization
-	resource.LoggerService.Info("Etcd client initialized successfully")
+	resource.LoggerService.Info(fmt.Sprintf("Etcd client initialized successfully"))
 	resource.EtcdClient = etcdClient
 
 	return nil
@@ -86,7 +86,7 @@ func CloseEtcd() error {
 			return err
 		}
 		// Log an informational message if the closure is successful
-		resource.LoggerService.Info("Etcd client closed successfully")
+		resource.LoggerService.Info(fmt.Sprintf("Etcd client closed successfully"))
 	}
 	return nil
 }

@@ -62,6 +62,7 @@ func InitRedisClient() error {
 	defer cancel()
 	// Ping the Redis server
 	if _, err := RedisClient.Ping(ctx).Result(); err != nil {
+		resource.LoggerService.Error(fmt.Sprintf("redis ping failed: %v", err))
 		return fmt.Errorf("redis ping failed: %w", err)
 	}
 
@@ -84,6 +85,7 @@ func CloseRedis() error {
 		// Attempt to close the Redis client connection
 		if err := resource.RedisClient.Close(); err != nil {
 			// Return an error if closing the connection fails
+			resource.LoggerService.Error(fmt.Sprintf("failed to close Redis connection: %v", err))
 			return fmt.Errorf("failed to close Redis connection: %w", err)
 		}
 	}

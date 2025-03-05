@@ -7,7 +7,7 @@ import (
 
 	"github.com/xiebingnote/go-gin-project/library/config"
 	"github.com/xiebingnote/go-gin-project/library/resource"
-	
+
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 )
 
@@ -62,7 +62,7 @@ func InitClickHouseClient() error {
 	}
 
 	// Log a message to indicate a successful connection to ClickHouse.
-	resource.LoggerService.Info("ClickHouse client connected successfully")
+	resource.LoggerService.Info(fmt.Sprintf("ClickHouse client connected successfully"))
 
 	// Store the initialized ClickHouse client in the resource package.
 	// The ClickHouse client is a pointer to a GORM database connection.

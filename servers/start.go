@@ -10,6 +10,7 @@ import (
 
 	"github.com/xiebingnote/go-gin-project/library/config"
 	"github.com/xiebingnote/go-gin-project/library/middleware"
+	"github.com/xiebingnote/go-gin-project/library/resource"
 	resp "github.com/xiebingnote/go-gin-project/library/response"
 	"github.com/xiebingnote/go-gin-project/servers/httpserver"
 
@@ -122,6 +123,7 @@ func runServer(srv *http.Server, name string) error {
 	// Attempt to start the server and listen for incoming requests.
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		// Return a formatted error message if the server fails to start.
+		resource.LoggerService.Error(fmt.Sprintf("%s server failed: %v", name, err))
 		return fmt.Errorf("%s server failed: %w", name, err)
 	}
 	// Return nil if the server shuts down gracefully.

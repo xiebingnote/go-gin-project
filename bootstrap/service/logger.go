@@ -18,7 +18,8 @@ import (
 func InitLogger(_ context.Context) {
 	var err error
 	resource.LoggerService, err = logger.NewJsonLogger(
-		//logger.WithDisableConsole(), // Disable console logging
+		logger.WithDisableConsole(), // Disable console logging
+
 		logger.WithDebugLevel(), // Set the log level to Debug
 
 		// Set the log directory to the value specified in the configuration

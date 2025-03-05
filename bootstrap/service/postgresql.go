@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/xiebingnote/go-gin-project/library/config"
@@ -53,6 +52,7 @@ func InitPostgresqlClient() error {
 		Logger: logger.Default.LogMode(logger.Info),
 	})
 	if err != nil {
+		resource.LoggerService.Error(fmt.Sprintf("gorm open failed: %v", err))
 		return fmt.Errorf("gorm open failed: %w", err)
 	}
 
@@ -60,7 +60,8 @@ func InitPostgresqlClient() error {
 	// The connection pool settings are configured with the Postgresql configuration
 	sqlDB, err := db.DB()
 	if err != nil {
-		log.Fatalf("Failed to get underlying sql.DB: %v", err)
+		resource.LoggerService.Error(fmt.Sprintf("get sql.DB failed: %v", err))
+		return fmt.Errorf("get sql.DB failed: %w", err)
 	}
 
 	// Configure the connection pool
@@ -97,6 +98,7 @@ func ClosePostgresql() error {
 
 			// Return an error if there is an issue getting the SQL DB object,
 			// This should not happen unless the resource has been tampered with
+			resource.LoggerService.Error(fmt.Sprintf("failed to get sql.DB: %v", err))
 			return fmt.Errorf("failed to get sql.DB: %w", err)
 		}
 
@@ -104,6 +106,7 @@ func ClosePostgresql() error {
 		if err := sqlDB.Close(); err != nil {
 			// Return an error if closing the connection fails,
 			// This could happen if the connection is already closed
+			resource.LoggerService.Error(fmt.Sprintf("failed to close Postgresql connection: %v", err))
 			return fmt.Errorf("failed to close Postgresql connection: %w", err)
 		}
 	}

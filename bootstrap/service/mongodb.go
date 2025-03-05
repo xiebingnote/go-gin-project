@@ -60,6 +60,7 @@ func InitMongoDBClient() error {
 	client, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
 		// If the connection fails, return an error.
+		resource.LoggerService.Error(fmt.Sprintf("failed to connect to MongoDB: %v", err))
 		return fmt.Errorf("failed to connect to MongoDB: %v", err)
 	}
 
@@ -67,11 +68,12 @@ func InitMongoDBClient() error {
 	err = client.Ping(context.TODO(), nil)
 	if err != nil {
 		// If the ping fails, return an error.
+		resource.LoggerService.Error(fmt.Sprintf("failed to ping MongoDB: %v", err))
 		return fmt.Errorf("failed to ping MongoDB: %v", err)
 	}
 
 	// Log a message to indicate a successful connection to MongoDB.
-	resource.LoggerService.Info("Successfully connected to MongoDB!")
+	resource.LoggerService.Info(fmt.Sprintf("Successfully connected to MongoDB!"))
 
 	// Store the initialized MongoDB client in the resource package.
 	// The MongoDB client is a pointer to a GORM database connection.
@@ -96,6 +98,7 @@ func CloseMongoDB() error {
 		// Attempt to disconnect the MongoDB client connection.
 		if err := resource.MongoDBClient.Client().Disconnect(context.Background()); err != nil {
 			// Return an error if disconnecting the connection fails.
+			resource.LoggerService.Error(fmt.Sprintf("failed to close MongoDB Client: %v", err))
 			return fmt.Errorf("failed to close MongoDB Client: %w", err)
 		}
 	}

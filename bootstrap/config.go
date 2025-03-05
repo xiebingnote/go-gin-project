@@ -61,6 +61,12 @@ func InitConfig(_ context.Context) {
 		panic("Failed to load Kafka configuration file: " + err.Error())
 	}
 
+	// Load Manticore Search configuration
+	if _, err := toml.DecodeFile("./conf/service/manticore.toml", &config.ManticoreConfig); err != nil {
+		// The Manticore configuration file could not be decoded. Panic with the error message.
+		panic("Failed to load Manticore configuration file: " + err.Error())
+	}
+	
 	// Load MongoDB configuration
 	if _, err := toml.DecodeFile("./conf/service/mongodb.toml", &config.MongoConfig); err != nil {
 		// The MongoDB configuration file could not be decoded. Panic with the error message.

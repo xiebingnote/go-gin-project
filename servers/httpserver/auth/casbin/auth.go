@@ -1,6 +1,7 @@
 package casbin
 
 import (
+	"fmt"
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
 
@@ -39,18 +40,21 @@ func Register(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		// Return an error response if the request body is invalid
+		resource.LoggerService.Error(fmt.Sprintf("Invalid request: %v", err))
 		resp.NewErrResp(c, http.StatusBadRequest, "Invalid request", reqID)
 		return
 	}
 
 	if req.Username == "" || req.Password == "" {
 		// Return an error response if the username or password is empty
+		resource.LoggerService.Error(fmt.Sprintf("Registration failed: Username and password are required"))
 		resp.NewErrResp(c, http.StatusBadRequest, "Registration failed: Username and password are required", reqID)
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		// Return an error response if password hashing fails
+		resource.LoggerService.Error(fmt.Sprintf("Registration failed: Unable to hash password"))
 		resp.NewErrResp(c, http.StatusInternalServerError, "Registration failed: Unable to hash password", reqID)
 		return
 	}
@@ -64,6 +68,7 @@ func Register(c *gin.Context) {
 	// Insert the user into the database
 	if result := resource.MySQLClient.Table("tb_user").Create(&user); result.Error != nil {
 		// Return an error response if the username already exists
+		resource.LoggerService.Error(fmt.Sprintf("Registration failed: Username already exists"))
 		resp.NewErrResp(c, http.StatusConflict, "Registration failed: Username already exists", reqID)
 		return
 	}
@@ -99,12 +104,14 @@ func Login(c *gin.Context) {
 	// Bind the incoming JSON request to the struct and validate it
 	if err := c.ShouldBindJSON(&req); err != nil {
 		// Return an error response if the request body is invalid
-		resp.NewErrResp(c, http.StatusBadRequest, "Invalid request", reqID)
+		resource.LoggerService.Error(fmt.Sprintf("Invalid request: %v", err))
+		resp.NewErrResp(c, http.StatusBadRequest, fmt.Sprintf("Invalid request: %v", err), reqID)
 		return
 	}
 
 	if req.Username == "" || req.Password == "" {
 		// Return an error response if the username or password is empty
+		resource.LoggerService.Error(fmt.Sprintf("Login failed: Username and password are required"))
 		resp.NewErrResp(c, http.StatusBadRequest, "Login failed: Username and password are required", reqID)
 		return
 	}
@@ -113,6 +120,7 @@ func Login(c *gin.Context) {
 	var user types.TbUser
 	if result := resource.MySQLClient.Table("tb_user").Where("username = ?", req.Username).First(&user); result.Error != nil {
 		// Return an error response if the user does not exist
+		resource.LoggerService.Error(fmt.Sprintf("Login failed: Invalid credentials"))
 		resp.NewErrResp(c, http.StatusUnauthorized, "Invalid credentials", reqID)
 		return
 	}
@@ -120,6 +128,7 @@ func Login(c *gin.Context) {
 	// Verify the password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		// Return an error response if the password is incorrect
+		resource.LoggerService.Error(fmt.Sprintf("Login failed: Invalid credentials"))
 		resp.NewErrResp(c, http.StatusUnauthorized, "Invalid credentials", reqID)
 		return
 	}
@@ -128,6 +137,7 @@ func Login(c *gin.Context) {
 	token, err := middleware.GenerateTokenCasbin(user.ID, user.Role)
 	if err != nil {
 		// Return an error response if JWT token generation fails
+		resource.LoggerService.Error(fmt.Sprintf("Login failed: %v", err))
 		resp.NewErrResp(c, http.StatusInternalServerError, err.Error(), reqID)
 		return
 	}

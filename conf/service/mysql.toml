@@ -18,7 +18,6 @@ Retry = 2
 Name = "Random"
 
 # 资源定位配置必须有且只有一项
-# 资源定位：使用 BNS
 [Resource.Manual]
 [[Resource.Manual.default]]
 Host = "127.0.0.1"

@@ -59,6 +59,9 @@ func MustInit(ctx context.Context) {
 	//// Initialize the Kafka
 	//service.InitKafka(ctx)
 	//
+	// Initialize the Manticore Search
+	//service.InitManticore(ctx)
+	//
 	//// Initialize the MongoDB database
 	//service.InitMongoDB(ctx)
 	//
@@ -139,6 +142,12 @@ func Close() error {
 
 	// Close the Kafka connections.
 	err = service.CloseKafka()
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	// Close the Manticore client.
+	err = service.CloseManticore()
 	if err != nil {
 		errs = append(errs, err)
 	}

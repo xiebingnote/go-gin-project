@@ -28,6 +28,7 @@ require (
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.23.2
+	github.com/manticoresoftware/manticoresearch-go v1.7.0
 	github.com/prometheus/client_golang v1.11.1
 	github.com/stretchr/testify v1.10.0
 	go.mongodb.org/mongo-driver v1.11.4
@@ -90,7 +91,6 @@ require (
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lib/pq v1.10.2 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
-	github.com/manticoresoftware/manticoresearch-go v1.7.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/microsoft/go-mssqldb v1.8.0 // indirect

@@ -6,6 +6,7 @@ import (
 	"github.com/casbin/casbin/v2"
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/go-co-op/gocron/v2"
+	manticore "github.com/manticoresoftware/manticoresearch-go"
 	"github.com/nsqio/go-nsq"
 	"github.com/olivere/elastic/v7"
 	cmap "github.com/orcaman/concurrent-map/v2"
@@ -31,6 +32,9 @@ var (
 
 	// LoggerService is the logger
 	LoggerService *zap.Logger
+
+	// ManticoreClient is the Manticore client
+	ManticoreClient *manticore.APIClient
 
 	MongoDBClient *mongo.Database
 
