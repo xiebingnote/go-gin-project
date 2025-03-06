@@ -62,6 +62,9 @@ var (
 	// Enforcer is the Casbin enforcer
 	Enforcer *casbin.Enforcer
 
+	// TDengineClient is the TDengine client
+	TDengineClient *sql.DB
+
 	// TestStringMapSet is the test string map set
 	TestStringMapSet *mapset.Set[string]
 

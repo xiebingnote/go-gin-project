@@ -23,11 +23,13 @@ import (
 //   - InitElasticSearch: initializes the ElasticSearch database
 //   - InitEtcd: initializes the etcd database
 //   - InitKafka: initializes the Kafka database
+//   - InitManticore: initializes the Manticore database
 //   - InitMongoDB: initializes the MongoDB database
 //   - InitMySQL: initializes the MySQL database
 //   - InitNSQ: initializes the NSQ database
 //   - InitPostgresql: initializes the Postgresql database
 //   - InitRedis: initializes the Redis database
+//   - InitTDengine: initializes the TDengine database
 //   - TaskStart: starts the one-off task
 //
 // If any of the initialization functions return an error, this function will panic with the error.
@@ -80,6 +82,9 @@ func MustInit(ctx context.Context) {
 	//// Initialize the Redis database
 	//service.InitRedis(ctx)
 	//
+	//// Initialize the TDengine database
+	//service.InitTDengine(ctx)
+	//
 	//TaskStart(ctx)
 }
 
@@ -114,6 +119,10 @@ func HookStd(_ context.Context) {
 //   - ClickHouse connection
 //   - Kafka connections
 //   - NSQ connections
+//   - Manticore client
+//   - etcd client
+//   - NSQ connections
+//   - TDengine client
 //   - Cron jobs scheduler
 //
 // Returns:
@@ -178,6 +187,12 @@ func Close() error {
 
 	// Close the Redis client.
 	err = service.CloseRedis()
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	// Close the TDengine client.
+	err = service.CloseTDengine()
 	if err != nil {
 		errs = append(errs, err)
 	}

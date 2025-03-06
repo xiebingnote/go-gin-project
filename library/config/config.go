@@ -36,4 +36,7 @@ var (
 
 	// ServerConfig server config entry
 	ServerConfig *ServerConfigEntry
+	
+	// TDengineConfig TDengine config entry
+	TDengineConfig *TDengineConfigEntry
 )

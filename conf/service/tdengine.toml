@@ -1,0 +1,6 @@
+[TDengine]
+Host = "127.0.0.1"
+Port = 6030
+UserName = "root"
+PassWord = "taosdata"
+Database = "test"

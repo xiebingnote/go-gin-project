@@ -66,7 +66,7 @@ func InitConfig(_ context.Context) {
 		// The Manticore configuration file could not be decoded. Panic with the error message.
 		panic("Failed to load Manticore configuration file: " + err.Error())
 	}
-	
+
 	// Load MongoDB configuration
 	if _, err := toml.DecodeFile("./conf/service/mongodb.toml", &config.MongoConfig); err != nil {
 		// The MongoDB configuration file could not be decoded. Panic with the error message.
@@ -93,6 +93,11 @@ func InitConfig(_ context.Context) {
 
 	// Load Redis configuration
 	if _, err := toml.DecodeFile("./conf/service/redis.toml", &config.RedisConfig); err != nil {
+		// The Redis configuration file could not be decoded. Panic with the error message.
+		panic("Failed to load Redis configuration file: " + err.Error())
+	}
+
+	if _, err := toml.DecodeFile("./conf/service/tdengine.toml", &config.TDengineConfig); err != nil {
 		// The Redis configuration file could not be decoded. Panic with the error message.
 		panic("Failed to load Redis configuration file: " + err.Error())
 	}
