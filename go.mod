@@ -28,9 +28,11 @@ require (
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.23.2
+	github.com/antage/eventsource v0.0.0-20220422142129-c4aae935d5bd
 	github.com/manticoresoftware/manticoresearch-go v1.7.0
 	github.com/prometheus/client_golang v1.11.1
 	github.com/stretchr/testify v1.10.0
+	github.com/taosdata/driver-go/v3 v3.5.0
 	go.mongodb.org/mongo-driver v1.11.4
 	gorm.io/driver/postgres v1.5.11
 )
@@ -110,7 +112,6 @@ require (
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
-	github.com/taosdata/driver-go/v3 v3.5.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
