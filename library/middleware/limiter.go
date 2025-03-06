@@ -1,13 +1,17 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/xiebingnote/go-gin-project/library/config"
 	"github.com/xiebingnote/go-gin-project/library/resource"
+	resp "github.com/xiebingnote/go-gin-project/library/response"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/ulule/limiter/v3"
 	limitergin "github.com/ulule/limiter/v3/drivers/middleware/gin"
 	"github.com/ulule/limiter/v3/drivers/store/memory"
@@ -160,5 +164,109 @@ func IPWhitelist(whitelist []string) gin.HandlerFunc {
 
 		// Abort the request with a 403 Forbidden status if the IP is not allowed
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "IP not allowed"})
+	}
+}
+
+// LoginRateLimiter returns a middleware that limits the number of login attempts
+// from a given IP address.
+//
+// The middleware uses a Redis script to increment the login attempt counter
+// for the client IP address.
+//
+// If the counter exceeds the configured limit (10 attempts in 1 second),
+// the request is aborted with 429 Too Much Requests status.
+//
+// Otherwise, the request proceeds to the next handler.
+//
+// Parameters:
+//   - None
+//
+// Returns:
+//   - gin.HandlerFunc: The Gin middleware function for login rate limiting.
+func LoginRateLimiter() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Generate a unique request ID
+		reqID := uuid.NewString()
+
+		// Construct the Redis key for the login attempt counter
+		key := fmt.Sprintf("rate_limit:login:%s", c.ClientIP())
+
+		// Execute the Redis script to increment the counter and check if the limit has been exceeded
+		allowed, err := resource.RedisClient.Eval(context.Background(), config.LuaScript, []string{key}, 1, 10).Int()
+		if err != nil {
+			// Log an error if the Redis eval fails
+			resource.LoggerService.Error(fmt.Sprintf("Redis eval failed: %v", err))
+
+			// Abort the request with a 500 Internal Server Error status
+			resp.NewErrResp(c, http.StatusInternalServerError, fmt.Sprintf("Redis eval failed: %v", err), reqID)
+			c.Abort()
+			return
+		}
+
+		// Check if the rate limit has been exceeded
+		if allowed == 0 {
+			// Log an error if the rate limit has been exceeded
+			resource.LoggerService.Error(fmt.Sprintf("Login rate limit exceeded"))
+
+			// Abort the request with 429 Too Much Requests status
+			resp.NewErrResp(c, http.StatusTooManyRequests, fmt.Sprintf("Too much login requests, rate limit exceeded"), reqID)
+			c.Abort()
+			return
+		}
+
+		// Proceed to the next handler if the rate limit has not been exceeded
+		c.Next()
+	}
+}
+
+// APIRateLimiter returns a middleware that limits the number of API requests
+// from a given IP address.
+//
+// The middleware uses a Redis script to increment the API request counter
+// for the client IP address.
+//
+// If the counter exceeds the configured limit (5 attempts in 1 second),
+// the request is aborted with 429 Too Much Requests status.
+//
+// Otherwise, the request proceeds to the next handler.
+//
+// Parameters:
+//   - None
+//
+// Returns:
+//   - gin.HandlerFunc: The Gin middleware function for API rate limiting.
+func APIRateLimiter() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Generate a unique request ID
+		reqID := uuid.NewString()
+
+		// Construct the Redis key for the api attempt counter
+		key := fmt.Sprintf("rate_limit:api:%s", c.ClientIP())
+
+		// Execute the Redis script to increment the counter and check if the limit has been exceeded
+		allowed, err := resource.RedisClient.Eval(context.Background(), config.LuaScript, []string{key}, 5, 1).Int()
+		if err != nil {
+			// Log an error if the Redis eval fails
+			resource.LoggerService.Error(fmt.Sprintf("Redis eval failed: %v", err))
+
+			// Abort the request with a 500 Internal Server Error status
+			resp.NewErrResp(c, http.StatusInternalServerError, "Redis eval failed", reqID)
+			c.Abort()
+			return
+		}
+
+		// Check if the rate limit has been exceeded
+		if allowed == 0 {
+			// Log an error if the rate limit has been exceeded
+			resource.LoggerService.Error(fmt.Sprintf("API request rate limit exceeded"))
+
+			// Abort the request with 429 Too Much Requests status
+			resp.NewErrResp(c, http.StatusTooManyRequests, "Too much API requests, rate limit exceeded", reqID)
+			c.Abort()
+			return
+		}
+
+		// Proceed to the next handler if the rate limit has not been exceeded
+		c.Next()
 	}
 }

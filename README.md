@@ -6,23 +6,24 @@
 
 ### 集成组件：
 
-1. 支持 rate 接口限流
-2. 支持 JWT 鉴权管理
-3. 支持 Casbin 权限管理
-4. 支持 zap 日志收集
-5. 支持 toml 配置文件解析
-6. 支持 gorm 数据库组件
-7. 支持 go-redis 组件
-8. 支持 MySQL, Postgresql 关系型数据库
-9. 支持 ElasticSearch, MongoDB 非关系型数据库
-10. 支持 Clickhouse 列式数据库
-11. 支持 Redis, Etcd 缓存数据库
-12. 支持 Kafka, NSQ 消息队列
-13. 支持 RESTful API 返回值规范
-14. 支持 pprof 性能剖析
-15. 支持 Prometheus 指标记录
-16. 支持 manticore search 搜索引擎
-17. 支持 TDengine 时序数据库
+1. 支持 rate 令牌桶限流
+2. 支持 redis + lua 分布式限流
+3. 支持 JWT 鉴权管理
+4. 支持 Casbin 权限管理
+5. 支持 zap 日志收集
+6. 支持 toml 配置文件解析
+7. 支持 gorm 数据库组件
+8. 支持 go-redis 组件
+9. 支持 MySQL, Postgresql 关系型数据库
+10. 支持 ElasticSearch, MongoDB 非关系型数据库
+11. 支持 Clickhouse 列式数据库
+12. 支持 Redis, Etcd 缓存数据库
+13. 支持 Kafka, NSQ 消息队列
+14. 支持 RESTful API 返回值规范
+15. 支持 pprof 性能剖析
+16. 支持 Prometheus 指标记录
+17. 支持 manticore search 搜索引擎
+18. 支持 TDengine 时序数据库
 
 ### 待添加完善：
 

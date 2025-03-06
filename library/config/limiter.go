@@ -25,3 +25,20 @@ var (
 		Limit:  10,
 	}
 )
+
+// LuaScript 脚本（用于限流）
+const LuaScript = `
+	local key = KEYS[1]
+	local limit = tonumber(ARGV[1])
+	local expireTime = tonumber(ARGV[2])
+
+	local current = redis.call("INCR", key)
+	if current == 1 then
+		redis.call("EXPIRE", key, expireTime)
+	end
+
+	if current > limit then
+		return 0
+	end
+	return 1
+`

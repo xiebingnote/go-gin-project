@@ -33,18 +33,15 @@ func NewServer() *gin.Engine {
 	// middleware.
 	router := gin.Default()
 
-	// Use memory limiter middleware with the specified rate.
-	router.Use(middleware.MemoryLimiter(config.PublicRate))
-
 	// JWT Register the auth endpoints.
-	router.POST("/web/api/login", jwt.Login)
+	router.POST("/web/api/login", middleware.MemoryLimiter(config.LoginRate), jwt.Login)
 	router.POST("/web/api/register", jwt.Register)
 
 	// Register the controllers with the gin.Engine.
 	// The controllers are registered at "/web/api/xxx/v1".
 	api := router.Group("/web/api")
 	// Apply JWT authentication middleware to the API group.
-	api.Use(middleware.AuthMiddlewareJWT)
+	api.Use(middleware.AuthMiddlewareJWT, middleware.APIRateLimiter())
 
 	Router(api)
 
