@@ -1,10 +1,10 @@
-package service
+package user
 
 import (
-	"github.com/xiebingnote/go-gin-project/model/dao"
+	user2 "github.com/xiebingnote/go-gin-project/model/dao/user"
 )
 
-var user = dao.NewUserClient()
+var user = user2.NewUserClient()
 
 // CreateTb creates the table in the database.
 //

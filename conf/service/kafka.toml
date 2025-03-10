@@ -7,11 +7,11 @@ Brokers = [
     #    "kafka3:9092"
 ]
 # 生产者配置
-ProducerTopic = "orders"
+ProducerTopic = "My_Topic"
 # 消费者配置
-ConsumerTopic = "order_status"
+ConsumerTopic = "My_Topic"
 # 消费者分组
-GroupID = "order-processor"
+GroupID = "My_Consumer_Group"
 # Kafka 版本
 # 需要与 Kafka 集群版本严格匹配
 Version = "3.5.1"

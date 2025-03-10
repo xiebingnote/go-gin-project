@@ -7,8 +7,7 @@ import (
 
 	"github.com/xiebingnote/go-gin-project/library/config"
 	"github.com/xiebingnote/go-gin-project/library/resource"
-
-	_ "github.com/taosdata/driver-go/v3/taosSql"
+	//_ "github.com/taosdata/driver-go/v3/taosSql"
 )
 
 // InitTDengine initializes the TDengine database connection.

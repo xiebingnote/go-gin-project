@@ -42,10 +42,15 @@ func InitKafkaClient() error {
 
 	// Initialize the producer
 	producerConfig := sarama.NewConfig()
+	// Enable return of successful messages
 	producerConfig.Producer.Return.Successes = true
+	// Enable return of errors
 	producerConfig.Producer.Return.Errors = true
-	producerConfig.Producer.RequiredAcks = sarama.WaitForAll // More reliable acknowledgment mechanism
-	producerConfig.Net.DialTimeout = 30 * time.Second        // Increase the connection timeout
+	// More reliable acknowledgment mechanism
+	producerConfig.Producer.RequiredAcks = sarama.WaitForAll
+	// Increase the connection timeout
+	producerConfig.Net.DialTimeout = 30 * time.Second
+	producerConfig.Producer.Retry.Max = config.KafkaConfig.Advanced.ProducerMaxRetry
 
 	// Parse the Kafka version string
 	version, err := sarama.ParseKafkaVersion(cfg.Kafka.Version)
@@ -65,7 +70,8 @@ func InitKafkaClient() error {
 	consumerConfig.Version = version
 	consumerConfig.Consumer.Offsets.Initial = sarama.OffsetOldest
 	consumerConfig.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{
-		sarama.NewBalanceStrategyRange(), // Use range partitioning strategy
+		// Use range partitioning strategy
+		sarama.NewBalanceStrategyRange(),
 	}
 
 	// Create a consumer group
@@ -175,10 +181,7 @@ func (h *KafkaConsumerHandler) Cleanup(sarama.ConsumerGroupSession) error {
 //
 // This function will be called for each message in the partition until the
 // message queue is empty, at which point the claim will be closed.
-func (h *KafkaConsumerHandler) ConsumeClaim(
-	session sarama.ConsumerGroupSession,
-	claim sarama.ConsumerGroupClaim,
-) error {
+func (h *KafkaConsumerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	// Iterate over the messages in the partition
 	for message := range claim.Messages() {
 		// Log the message

@@ -81,18 +81,15 @@ func NewServerCasbin() *gin.Engine {
 	// Create a new gin.Engine with default middleware (Logger and Recovery).
 	router := gin.Default()
 
-	// Use memory limiter middleware with the specified rate.
-	router.Use(middleware.MemoryLimiter(config.PublicRate))
-
 	// Register the authentication endpoints for login and registration.
-	router.POST("/web/api/v1/login", authcasbin.Login)
+	router.POST("/web/api/v1/login", middleware.LoginRateLimiter(), authcasbin.Login)
 	router.POST("/web/api/v1/register", authcasbin.Register)
 
 	// Create an API group for versioned routes and apply Casbin authorization middleware.
 	api := router.Group("/web/api")
 
 	// Apply Casbin authorization middleware to the API group.
-	api.Use(middleware.AuthMiddlewareCasbin())
+	api.Use(middleware.AuthMiddlewareCasbin(), middleware.APIRateLimiter())
 
 	// Register additional routes with the API group.
 	Router(api)

@@ -33,7 +33,7 @@ type option struct {
 //
 // Example:
 //
-//	 logger, err := logger.NewJsonLogger(
+//	 logger, err:= logger.NewJsonLogger(
 //			logger.WithDebugLevel(),
 //		)
 //
@@ -52,7 +52,7 @@ func WithDebugLevel() Option {
 //
 // Example:
 //
-//	 logger, err := logger.NewJsonLogger(
+//	 logger, err:= logger.NewJsonLogger(
 //			logger.WithWarnLevel(),
 //		)
 func WithWarnLevel() Option {
@@ -68,7 +68,7 @@ func WithWarnLevel() Option {
 //
 // Example:
 //
-//	 logger, err := logger.NewJsonLogger(
+//	 logger, err:= logger.NewJsonLogger(
 //			logger.WithErrorLevel(),
 //		)
 func WithErrorLevel() Option {
@@ -87,7 +87,7 @@ func WithErrorLevel() Option {
 //
 // Example:
 //
-//	 logger, err := logger.NewJsonLogger(
+//	 logger, err:= logger.NewJsonLogger(
 //			logger.WithField("service", "myapp"),
 //		)
 func WithField(key, val string) Option {
@@ -107,7 +107,7 @@ func WithField(key, val string) Option {
 //
 // Example:
 //
-//	 logger, err := logger.NewJsonLogger(
+//	 logger, err:= logger.NewJsonLogger(
 //			logger.WithTimeLayout("2006-01-02 15:04:05"),
 //		)
 func WithTimeLayout(timeLayout string) Option {
@@ -123,7 +123,7 @@ func WithTimeLayout(timeLayout string) Option {
 //
 // Example:
 //
-//	 logger, err := logger.NewJsonLogger(
+//	 logger, err:= logger.NewJsonLogger(
 //			logger.WithDisableConsole(),
 //		)
 func WithDisableConsole() Option {
@@ -140,7 +140,7 @@ func WithDisableConsole() Option {
 //
 // Example:
 //
-//	 logger, err := logger.NewJsonLogger(
+//	 logger, err:= logger.NewJsonLogger(
 //			logger.WithLogDir("/var/log"),
 //		)
 func WithLogDir(logDir string) Option {

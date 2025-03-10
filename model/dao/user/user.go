@@ -1,4 +1,4 @@
-package dao
+package user
 
 import (
 	"github.com/xiebingnote/go-gin-project/library/resource"
