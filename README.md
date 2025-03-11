@@ -31,7 +31,6 @@
 1. 各组件 Prometheus 监控指标
 
 ## 2、项目结构：
-
     .
     ├── README.md               # readme
     ├── bin                     # 编译后的可执行文件存放目录    
@@ -39,46 +38,19 @@
     ├── bootstrap               # 启动配置文件夹
     │   ├── bootstrap.go        # 启动文件
     │   ├── config.go           # 配置文件
-    │   ├── service             # 服务组件文件夹
-    │   │   ├── casbin.go
-    │   │   ├── clickhouse.go
-    │   │   ├── common.go
-    │   │   ├── cron.go
-    │   │   ├── elasticsearch.go
-    │   │   ├── etcd.go
-    │   │   ├── kafka.go
-    │   │   ├── logger.go
-    │   │   ├── manticore.go
-    │   │   ├── mongodb.go
-    │   │   ├── mysql.go
-    │   │   ├── nsq.go
-    │   │   ├── postgresql.go
-    │   │   ├── redis.go
-    │   │   └── tdengine.go
+    │   ├── service             # 各类服务组件文件夹
     │   └── task.go             # 定时任务
     ├── conf                    # 配置文件文件夹
     │   ├── log                 # 日志配置文件夹
     │   │   └── log.toml
     │   ├── server.toml         # service服务配置文件
-    │   └── service             # 服务组件配置文件夹
-    │       ├── casbin.conf
-    │       ├── clickhouse.toml
-    │       ├── elasticsearch.toml
-    │       ├── etcd.toml
-    │       ├── kafka.toml
-    │       ├── manticore.toml
-    │       ├── mongodb.toml
-    │       ├── mysql.toml
-    │       ├── nsq.toml
-    │       ├── postgresql.toml
-    │       ├── redis.toml
-    │       └── tdengine.toml
+    │   └── service             # service文件夹：各类服务组件配置
     ├── docker                  # docker相关配置
     │   ├── docker-compose.yml  # docker-compose配置
     │   └── manticore-init.sql  # manticore初始化sql
     ├── go.mod
     ├── go.sum
-    ├── library                 # 公共组件文件夹
+    ├── library                 # library文件夹
     │   ├── common              # 公共组件
     │   │   ├── cmap.go         # cmap
     │   │   ├── const.go        # 公共常量
@@ -87,26 +59,11 @@
     │   │   ├── serialize.go    # serialize 序列化
     │   │   ├── stack.go        # stack 栈
     │   │   └── time.go         # 时间相关函数
-    │   ├── config              # 组件配置结构
-    │   │   ├── clickhouse.go
-    │   │   ├── config.go
-    │   │   ├── elasticsearch.go
-    │   │   ├── etcd.go
-    │   │   ├── kafka.go
-    │   │   ├── limiter.go
-    │   │   ├── log.go
-    │   │   ├── manticore.go
-    │   │   ├── mongodb.go
-    │   │   ├── mysql.go
-    │   │   ├── nsq.go
-    │   │   ├── postgresql.go
-    │   │   ├── redis.go
-    │   │   ├── server.go
-    │   │   └── tdengine.go
-    │   ├── middleware          # 中间件组件
+    │   ├── config              # config文件夹：各类组件配置结构目录
+    │   ├── middleware          # 中间件目录
     │   │   ├── casbin.go       # casbin 权限管理
     │   │   ├── jwt.go          # jwt 权限管理
-    │   │   ├── limiter.go      # 限流
+    │   │   ├── limiter.go      # 限流中间件
     │   │   └── prometheus.go   # prometheus 监控
     │   ├── request             # 请求组件
     │   │   └── request.go
@@ -114,14 +71,13 @@
     │   │   └── resource.go
     │   └── response            # 响应组件
     │       └── response.go
-    ├── log                     # 日志存放文件夹
-    │   └── log.md
+    ├── log                     # 日志文件存放目录
     ├── main.go                 # 项目启动 main 文件
     ├── model                   # 数据模型文件夹
     │   ├── dao                 # dao层文件夹
     │   ├── service             # service层
     │   └── types               # 类型定义文件夹
-    │       └── common.go
+    │       └── common.go       # 公共类型定义
     ├── pkg                     # 公共组件文件夹
     │   ├── logger              # 日志组件
     │   │   └── logger.go
@@ -129,19 +85,15 @@
     │   │   └── proto.md
     │   └── shutdown            # 关闭服务
     │       └── shutdown.go
-    └── servers # 服务文件夹
+    └── servers                 # 服务目录
         ├── httpserver          # http服务
         │   ├── auth            # 认证模块
         │   │   ├── casbin      # casbin 权限管理
-        │   │   │   ├── auth.go
-        │   │   │   └── auth_test.go
         │   │   └── jwt         # jwt 权限管理
-        │   │       ├── auth.go
-        │   │       └── auth_test.go
-        │   ├── controller      # 业务实现层
+        │   ├── controller      # 业务实现层目录
         │   │   └── router.go   # 业务逻辑路由
         │   ├── router.go       # 服务层路由
-        │   └── server.go       # http服务
+        │   └── server.go       # gin 服务入口
         └── start.go            # 启动服务
 
 ## 3、架构图：
