@@ -1,6 +1,6 @@
 # github.com/xiebingnote/go-gin-project
 
-基于 Gin 进行模块化设计的 API 框架，封装了常用的功能，包括消息队列，数据库等，使用简单，致力于进行快速的业务研发。
+基于 Gin 进行模块化设计的 API 框架，封装了常用的功能，包括限流，性能监控，日志，消息队列，数据库等，使用简单，致力于进行快速的业务研发。
 
 仅供参考学习，线上请谨慎使用！！！
 
@@ -38,7 +38,7 @@
     ├── bootstrap               # 启动配置文件夹
     │   ├── bootstrap.go        # 启动文件
     │   ├── config.go           # 配置文件
-    │   ├── service             # 各类服务组件文件夹
+    │   ├── service             # service文件夹：初始化各类服务组件
     │   └── task.go             # 定时任务
     ├── conf                    # 配置文件文件夹
     │   ├── log                 # 日志配置文件夹
@@ -88,8 +88,8 @@
     └── servers                 # 服务目录
         ├── httpserver          # http服务
         │   ├── auth            # 认证模块
-        │   │   ├── casbin      # casbin 权限管理
-        │   │   └── jwt         # jwt 权限管理
+        │   │   ├── casbin      # casbin 权限管理目录
+        │   │   └── jwt         # jwt 权限管理目录
         │   ├── controller      # 业务实现层目录
         │   │   └── router.go   # 业务逻辑路由
         │   ├── router.go       # 服务层路由
