@@ -4,7 +4,7 @@
 
 仅供参考学习，线上请谨慎使用！！！
 
-### 集成组件：
+### 1、集成组件：
 
 1. 支持 rate 令牌桶限流
 2. 支持 redis + lua 分布式限流
@@ -24,12 +24,125 @@
 16. 支持 Prometheus 指标记录
 17. 支持 manticore search 搜索引擎
 18. 支持 TDengine 时序数据库
+19. 支持 protobuf 序列化
 
 ### 待添加完善：
 
 1. 各组件 Prometheus 监控指标
 
-## 架构图：
+## 2、项目结构：
+    .
+    ├── README.md               # readme
+    ├── bin                     # 编译后的可执行文件存放目录    
+    │   └── bin.md
+    ├── bootstrap               # 启动配置文件夹
+    │   ├── bootstrap.go        # 启动文件
+    │   ├── config.go           # 配置文件
+    │   ├── service             # 服务组件文件夹
+    │   │   ├── casbin.go
+    │   │   ├── clickhouse.go
+    │   │   ├── common.go
+    │   │   ├── cron.go
+    │   │   ├── elasticsearch.go
+    │   │   ├── etcd.go
+    │   │   ├── kafka.go
+    │   │   ├── logger.go
+    │   │   ├── manticore.go
+    │   │   ├── mongodb.go
+    │   │   ├── mysql.go
+    │   │   ├── nsq.go
+    │   │   ├── postgresql.go
+    │   │   ├── redis.go
+    │   │   └── tdengine.go
+    │   └── task.go             # 定时任务
+    ├── conf                    # 配置文件文件夹
+    │   ├── log                 # 日志配置文件夹
+    │   │   └── log.toml
+    │   ├── server.toml         # service服务配置文件
+    │   └── service             # 服务组件配置文件夹
+    │       ├── casbin.conf
+    │       ├── clickhouse.toml
+    │       ├── elasticsearch.toml
+    │       ├── etcd.toml
+    │       ├── kafka.toml
+    │       ├── manticore.toml
+    │       ├── mongodb.toml
+    │       ├── mysql.toml
+    │       ├── nsq.toml
+    │       ├── postgresql.toml
+    │       ├── redis.toml
+    │       └── tdengine.toml
+    ├── docker                  # docker相关配置
+    │   ├── docker-compose.yml  # docker-compose配置
+    │   └── manticore-init.sql  # manticore初始化sql
+    ├── go.mod
+    ├── go.sum
+    ├── library                 # 公共组件文件夹
+    │   ├── common              # 公共组件
+    │   │   ├── cmap.go         # cmap
+    │   │   ├── const.go        # 公共常量
+    │   │   ├── eventsource.go  # eventsource
+    │   │   ├── mapset.go       # mapset集合
+    │   │   ├── stack.go        # stack
+    │   │   └── time.go         # 时间相关
+    │   ├── config              # 组件配置结构
+    │   │   ├── clickhouse.go
+    │   │   ├── config.go
+    │   │   ├── elasticsearch.go
+    │   │   ├── etcd.go
+    │   │   ├── kafka.go
+    │   │   ├── limiter.go
+    │   │   ├── log.go
+    │   │   ├── manticore.go
+    │   │   ├── mongodb.go
+    │   │   ├── mysql.go
+    │   │   ├── nsq.go
+    │   │   ├── postgresql.go
+    │   │   ├── redis.go
+    │   │   ├── server.go
+    │   │   └── tdengine.go
+    │   ├── middleware          # 中间件组件
+    │   │   ├── casbin.go       # casbin 权限管理
+    │   │   ├── jwt.go          # jwt 权限管理
+    │   │   ├── limiter.go      # 限流
+    │   │   └── prometheus.go   # prometheus 监控
+    │   ├── request             # 请求组件
+    │   │   └── request.go
+    │   ├── resource            # 资源组件
+    │   │   └── resource.go
+    │   └── response            # 响应组件
+    │       └── response.go
+    ├── log                     # 日志存放文件夹
+    │   └── log.md
+    ├── main.go                 # 项目启动 main 文件
+    ├── model                   # 数据模型文件夹
+    │   ├── dao                 # dao层文件夹
+    │   ├── service             # service层
+    │   └── types               # 类型定义文件夹
+    │       └── common.go
+    ├── pkg                     # 公共组件文件夹
+    │   ├── logger              # 日志组件
+    │   │   └── logger.go
+    │   ├── proto               # protobuf
+    │   │   └── proto.md
+    │   └── shutdown            # 关闭服务
+    │       └── shutdown.go
+    └── servers # 服务文件夹
+        ├── httpserver          # http服务
+        │   ├── auth            # 认证模块
+        │   │   ├── casbin      # casbin 权限管理
+        │   │   │   ├── auth.go
+        │   │   │   └── auth_test.go
+        │   │   └── jwt         # jwt 权限管理
+        │   │       ├── auth.go
+        │   │       └── auth_test.go
+        │   ├── controller      # 业务实现层
+        │   │   └── router.go   # 业务逻辑路由
+        │   ├── router.go       # 服务层路由
+        │   └── server.go       # http服务
+        └── start.go            # 启动服务
+
+## 3、架构图：
 
 项目整体架构如下所示：
 ![img.png](img.png)
