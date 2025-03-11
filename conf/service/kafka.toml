@@ -11,6 +11,10 @@ ProducerTopic = "My_Topic"
 # 消费者配置
 ConsumerTopic = "My_Topic"
 # 消费者分组
+ConsumerGroupTopic = [
+    "My_Topic",
+]
+# 消费者分组
 GroupID = "My_Consumer_Group"
 # Kafka 版本
 # 需要与 Kafka 集群版本严格匹配

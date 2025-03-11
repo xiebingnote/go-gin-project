@@ -57,7 +57,10 @@ var (
 	KafkaProducer sarama.SyncProducer
 
 	// KafkaConsumer is the Kafka consumer
-	KafkaConsumer sarama.ConsumerGroup
+	KafkaConsumer sarama.Consumer
+
+	// KafkaConsumerGroup is the Kafka consumer
+	KafkaConsumerGroup sarama.ConsumerGroup
 
 	// Enforcer is the Casbin enforcer
 	Enforcer *casbin.Enforcer

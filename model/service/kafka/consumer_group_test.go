@@ -43,22 +43,24 @@ func init() {
 	service.InitKafka(context.Background())
 }
 
-// TestProducer_Success tests the successful production of a message.
+// TestConsumerGroup_Success tests the successful operation of a Kafka consumer group.
 //
-// It calls the Producer function and checks for errors.
-//
-// If no error occurs, it logs that the message was produced successfully.
-//
-// If an error occurs, it logs the failure.
-func TestProducer_Success(t *testing.T) {
-	// Call the Producer function to produce a message
-	err := Producer()
-	if err != nil {
-		// Log an error message if message production fails
-		fmt.Println("Failed to produce message:", err)
-	} else {
-		// Log a success message if message production succeeds
-		fmt.Println("Message produced successfully.")
+// It initializes a consumer group handler and starts the Kafka consumer with the
+// specified topic and handler. It then checks for errors, logging an error if the
+// consumer fails to start, otherwise logging a success message.
+func TestConsumerGroup_Success(t *testing.T) {
+	// Initialize the consumer group handler with a ready channel
+	handler := &ExampleConsumerGroupHandler{
+		Ready: make(chan bool),
 	}
-	return
+
+	// Start the Kafka consumer with the specified topic and handler
+	err := StartKafkaConsumer(config.KafkaConfig.Kafka.ConsumerGroupTopic, handler)
+	if err != nil {
+		// Log an error if the consumer fails to start
+		t.Errorf("Failed to consumer message: %v", err)
+	} else {
+		// Log a success message if the consumer starts successfully
+		fmt.Println("Message consumer successfully.")
+	}
 }

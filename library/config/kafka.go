@@ -3,11 +3,12 @@ package config
 // KafkaConfigEntry kafka配置
 type KafkaConfigEntry struct {
 	Kafka struct {
-		Brokers       []string `toml:"Brokers"`       // Kafka broker address
-		ProducerTopic string   `toml:"ProducerTopic"` // 生产者主题
-		ConsumerTopic string   `toml:"ConsumerTopic"` // 消费者主题
-		GroupID       string   `toml:"GroupID"`       // 消费者组ID
-		Version       string   `toml:"Version"`       // Kafka version，eg: "2.8.0"
+		Brokers            []string `toml:"Brokers"`            // Kafka broker address
+		ProducerTopic      string   `toml:"ProducerTopic"`      // 生产者主题
+		ConsumerTopic      string   `toml:"ConsumerTopic"`      // 消费者主题
+		ConsumerGroupTopic []string `toml:"ConsumerGroupTopic"` // 消费者组主题
+		GroupID            string   `toml:"GroupID"`            // 消费者组ID
+		Version            string   `toml:"Version"`            // Kafka version，eg: "2.8.0"
 	} `toml:"Kafka"`
 
 	Advanced struct {

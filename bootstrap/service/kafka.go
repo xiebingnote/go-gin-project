@@ -41,6 +41,7 @@ func InitKafkaClient() error {
 	cfg := config.KafkaConfig
 
 	// Initialize the producer
+	// Create a producer configuration
 	producerConfig := sarama.NewConfig()
 	// Enable return of successful messages
 	producerConfig.Producer.Return.Successes = true
@@ -50,6 +51,7 @@ func InitKafkaClient() error {
 	producerConfig.Producer.RequiredAcks = sarama.WaitForAll
 	// Increase the connection timeout
 	producerConfig.Net.DialTimeout = 30 * time.Second
+	// Increase the maximum number of retries
 	producerConfig.Producer.Retry.Max = config.KafkaConfig.Advanced.ProducerMaxRetry
 
 	// Parse the Kafka version string
@@ -66,6 +68,7 @@ func InitKafkaClient() error {
 	}
 
 	// Initialize the consumer
+	// Create a consumer configuration
 	consumerConfig := sarama.NewConfig()
 	consumerConfig.Version = version
 	consumerConfig.Consumer.Offsets.Initial = sarama.OffsetOldest
@@ -74,16 +77,22 @@ func InitKafkaClient() error {
 		sarama.NewBalanceStrategyRange(),
 	}
 
-	// Create a consumer group
-	resource.KafkaConsumer, err = sarama.NewConsumerGroup(cfg.Kafka.Brokers, cfg.Kafka.GroupID, consumerConfig)
+	// Initialize the consumer
+	resource.KafkaConsumer, err = sarama.NewConsumer(cfg.Kafka.Brokers, consumerConfig)
 	if err != nil {
 		return fmt.Errorf("kafka consumer init failed: %w", err)
+	}
+
+	// Initialize the consumer group
+	resource.KafkaConsumerGroup, err = sarama.NewConsumerGroup(cfg.Kafka.Brokers, cfg.Kafka.GroupID, consumerConfig)
+	if err != nil {
+		return fmt.Errorf("kafka consumer group init failed: %w", err)
 	}
 
 	// Start a background health check
 	go kafkaHealthCheck(context.Background())
 
-	resource.LoggerService.Info(fmt.Sprintf("Kafka initialized | Brokers: %v | Version: %s", cfg.Kafka.Brokers, cfg.Kafka.Version))
+	//resource.LoggerService.Info(fmt.Sprintf("Kafka initialized | Brokers: %v | Version: %s", cfg.Kafka.Brokers, cfg.Kafka.Version))
 	return nil
 }
 
@@ -107,6 +116,13 @@ func CloseKafka() error {
 	if resource.KafkaConsumer != nil {
 		if err := resource.KafkaConsumer.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("consumer close failed: %w", err))
+		}
+	}
+
+	// Close the consumer group
+	if resource.KafkaConsumerGroup != nil {
+		if err := resource.KafkaConsumerGroup.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("consumer group close failed: %w", err))
 		}
 	}
 
@@ -136,16 +152,9 @@ func kafkaHealthCheck(ctx context.Context) {
 					Topic: "health_check_topic",
 					Value: sarama.StringEncoder("ping"),
 				}); err != nil {
-					resource.LoggerService.Error(fmt.Sprintf("K))afka producer health check failed: %v", err))
+					resource.LoggerService.Error(fmt.Sprintf("Kafka producer health check failed: %v", err))
 					return
-				} else {
-					resource.LoggerService.Info(fmt.Sprintf("Kafka producer health check succeeded"))
 				}
-			}
-
-			// Check the health of the Kafka consumer
-			if resource.KafkaConsumer != nil {
-				resource.LoggerService.Info(fmt.Sprintf("Kafka consumer is running"))
 			}
 
 		case <-ctx.Done():
@@ -153,68 +162,4 @@ func kafkaHealthCheck(ctx context.Context) {
 			return
 		}
 	}
-}
-
-type KafkaConsumerHandler struct {
-	Ready chan bool
-}
-
-// Setup is run at the beginning of a new session, before ConsumeClaim.
-// It closes the Ready channel to signal that the consumer is ready.
-func (h *KafkaConsumerHandler) Setup(sarama.ConsumerGroupSession) error {
-	// Close the Ready channel to indicate readiness
-	close(h.Ready)
-	return nil
-}
-
-// Cleanup is called once all ConsumeClaim goroutines have exited.
-// It is a last chance to clean up any resources, but it is not
-// a guarantee that it will be called in all cases (e.g., if the
-// process is killed).
-func (h *KafkaConsumerHandler) Cleanup(sarama.ConsumerGroupSession) error {
-	return nil
-}
-
-// ConsumeClaim is called once for each consumer claim being consumed.
-// A claim is a unique partition of a topic that the consumer is responsible
-// for consuming. The claim is closed when the consumer is done consuming.
-//
-// This function will be called for each message in the partition until the
-// message queue is empty, at which point the claim will be closed.
-func (h *KafkaConsumerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
-	// Iterate over the messages in the partition
-	for message := range claim.Messages() {
-		// Log the message
-		resource.LoggerService.Info(fmt.Sprintf("Message received: Topic=%s Partition=%d Offset=%d Key=%s Value=%s",
-			message.Topic, message.Partition, message.Offset,
-			string(message.Key), string(message.Value)))
-
-		// Mark the message as processed
-		session.MarkMessage(message, "")
-	}
-	return nil
-}
-
-// StartKafkaConsumer starts a Kafka consumer that consumes messages from the specified topics.
-//
-// It will block until the consumer is ready to consume messages.
-func StartKafkaConsumer(topics []string) {
-	handler := &KafkaConsumerHandler{
-		Ready: make(chan bool),
-	}
-
-	// Start the consumer in a separate goroutine
-	go func() {
-		for {
-			// Consume messages from the specified topics
-			if err := resource.KafkaConsumer.Consume(context.Background(), topics, handler); err != nil {
-				resource.LoggerService.Error(fmt.Sprintf("Kafka consumer error: %v", err))
-				return
-			}
-		}
-	}()
-
-	// Wait until the consumer is ready
-	<-handler.Ready
-	resource.LoggerService.Info(fmt.Sprintf("Kafka consumer is ready"))
 }

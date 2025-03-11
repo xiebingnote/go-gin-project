@@ -31,6 +31,7 @@
 1. 各组件 Prometheus 监控指标
 
 ## 2、项目结构：
+
     .
     ├── README.md               # readme
     ├── bin                     # 编译后的可执行文件存放目录    
@@ -81,10 +82,11 @@
     │   ├── common              # 公共组件
     │   │   ├── cmap.go         # cmap
     │   │   ├── const.go        # 公共常量
-    │   │   ├── eventsource.go  # eventsource
+    │   │   ├── eventsource.go  # eventsource 事件源
     │   │   ├── mapset.go       # mapset集合
-    │   │   ├── stack.go        # stack
-    │   │   └── time.go         # 时间相关
+    │   │   ├── serialize.go    # serialize 序列化
+    │   │   ├── stack.go        # stack 栈
+    │   │   └── time.go         # 时间相关函数
     │   ├── config              # 组件配置结构
     │   │   ├── clickhouse.go
     │   │   ├── config.go
