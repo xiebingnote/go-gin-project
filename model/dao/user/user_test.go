@@ -12,13 +12,13 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-var userClient *UserClient
+var userClient *ClientUser
 
 // Init initializes the user client and loads necessary configurations.
 //
 // It retrieves the current working directory, loads the MySQL configuration
 // from a TOML file, and initializes the MySQL service. It then creates a new
-// instance of UserClient.
+// instance of ClientUser.
 func init() {
 	// Retrieve the current working directory
 	rootDir, err := os.Getwd()
@@ -40,7 +40,7 @@ func init() {
 	// Initialize the MySQL service with a background context
 	service.InitMySQL(context.Background())
 
-	// Create a new UserClient instance and assign it to the global variable
+	// Create a new ClientUser instance and assign it to the global variable
 	userClient = NewUserClient()
 }
 

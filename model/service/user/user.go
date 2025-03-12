@@ -1,10 +1,10 @@
 package user
 
 import (
-	user2 "github.com/xiebingnote/go-gin-project/model/dao/user"
+	"github.com/xiebingnote/go-gin-project/model/dao/user"
 )
 
-var user = user2.NewUserClient()
+var clientUser = user.NewUserClient()
 
 // CreateTb creates the table in the database.
 //
@@ -13,7 +13,7 @@ var user = user2.NewUserClient()
 //
 // Returns an error if the table creation fails.
 func CreateTb() error {
-	return user.CreateTb()
+	return clientUser.CreateTb()
 }
 
 // GetUserNameByID retrieves the username associated with the given ID.
@@ -22,5 +22,5 @@ func CreateTb() error {
 // associated with the given ID. If the retrieval fails or the user is not found,
 // it returns an empty string and the error.
 func GetUserNameByID(id string) (string, error) {
-	return user.GetUserNameByID(id)
+	return clientUser.GetUserNameByID(id)
 }

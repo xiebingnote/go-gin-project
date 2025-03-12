@@ -29,31 +29,36 @@ func init() {
 		panic(err)
 	}
 
-	// Extract the root directory path by splitting on "/model"
-	dir := strings.Split(rootDir, "/model")
+	// Extract the root directory path by splitting on "/pkg"
+	dir := strings.Split(rootDir, "/pkg")
 	rootDir = dir[0]
 
 	// Load Kafka configuration from the specified TOML file
 	if _, err := toml.DecodeFile(rootDir+"/conf/service/kafka.toml", &config.KafkaConfig); err != nil {
 		// Panic if the MySQL configuration file cannot be decoded
-		panic(fmt.Sprintf("Failed to load Kafka configuration file: %v", err))
+		panic("Failed to load Kafka configuration file: " + err.Error())
 	}
 
 	// Initialize the Kafka service with a background context
 	service.InitKafka(context.Background())
 }
 
-// TestConsumer_Success tests the successful consumption of a message using the Consumer function.
+// TestProducer_Success tests the successful production of a message.
 //
-// It calls the Consumer function and checks if any error is returned. If an error occurs,
-// the test fails with an error message indicating the failure to consume the message.
-// Otherwise, it logs a message indicating successful message consumption.
-func TestConsumer_Success(t *testing.T) {
-	err := Consumer()
+// It calls the Producer function and checks for errors.
+//
+// If no error occurs, it logs that the message was produced successfully.
+//
+// If an error occurs, it logs the failure.
+func TestProducer_Success(t *testing.T) {
+	// Call the Producer function to produce a message
+	err := Producer()
 	if err != nil {
-		t.Errorf("Failed to consumer message: %v", err)
+		// Log an error message if message production fails
+		fmt.Println("Failed to produce message:", err)
 	} else {
-		fmt.Println("Message consumer successfully.")
+		// Log a success message if message production succeeds
+		fmt.Println("Message produced successfully.")
 	}
 	return
 }

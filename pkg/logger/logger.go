@@ -245,11 +245,11 @@ func NewJsonLogger(opts ...Option) (*zap.Logger, error) {
 	// Combine the cores into a single tee core
 	core := zapcore.NewTee(debugCore, infoCore, warnCore, errorCore)
 
+	stdout := zapcore.Lock(os.Stdout)
+	stderr := zapcore.Lock(os.Stderr)
+
 	// Optionally add console logging to the core
 	if !opt.disableConsole {
-		stdout := zapcore.Lock(os.Stdout)
-		stderr := zapcore.Lock(os.Stderr)
-
 		core = zapcore.NewTee(core,
 			zapcore.NewCore(jsonEncoder, zapcore.NewMultiWriteSyncer(stdout), zapcore.InfoLevel),
 			zapcore.NewCore(jsonEncoder, zapcore.NewMultiWriteSyncer(stderr), zapcore.ErrorLevel),

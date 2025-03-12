@@ -20,8 +20,6 @@ func InitLogger(_ context.Context) {
 	resource.LoggerService, err = logger.NewJsonLogger(
 		logger.WithDisableConsole(), // Disable console logging
 
-		logger.WithDebugLevel(), // Set the log level to Debug
-
 		// Set the log directory to the value specified in the configuration
 		logger.WithLogDir(config.LogConfig.Log.LogDir),
 

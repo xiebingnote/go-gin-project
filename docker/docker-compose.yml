@@ -3,6 +3,10 @@
 # 卸载执行命令： docker-compose -f docker-compose.yml down
 
 version: '3'
+networks:
+  nsq_network:
+    driver: bridge
+
 services:
   mysql:
     container_name: mysql
@@ -83,29 +87,36 @@ services:
     container_name: nsqlookupd
     restart: always
     image: nsqio/nsq
-    command: /nsqlookupd
+    command: nsqlookupd
     ports:
       - "4160:4160"
       - "4161:4161"
+    networks:
+      - nsq_network
   nsqd:
     container_name: nsqd
     restart: always
     image: nsqio/nsq
-    command: /nsqd --lookupd-tcp-address=nsqlookupd:4160
+    #    command: nsqd --broadcast-address=127.0.0.1 --tcp-address=127.0.0.1:4150 --lookupd-tcp-address=nsqlookupd:4160
+    command: nsqd --broadcast-address=127.0.0.1  --lookupd-tcp-address=nsqlookupd:4160
     depends_on:
       - nsqlookupd
     ports:
-      - "4150:4150"
+      - "4150:9150"
       - "4151:4151"
+    networks:
+      - nsq_network
   nsqadmin:
     container_name: nsqadmin
     restart: always
     image: nsqio/nsq
-    command: /nsqadmin --lookupd-http-address=nsqlookupd:4161
+    command: nsqadmin --lookupd-http-address=nsqlookupd:4161
     depends_on:
       - nsqlookupd
     ports:
       - "4171:4171"
+    networks:
+      - nsq_network
 
   zookeeper:
     container_name: zookeeper

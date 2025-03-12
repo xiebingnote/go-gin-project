@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/xiebingnote/go-gin-project/bootstrap"
 	"github.com/xiebingnote/go-gin-project/library/resource"
 	"github.com/xiebingnote/go-gin-project/pkg/shutdown"
 	"github.com/xiebingnote/go-gin-project/servers"
+	"go.uber.org/zap"
 )
 
 // The main is the entry point of the application, responsible for initializing
@@ -25,6 +27,18 @@ import (
 //  5. Configure a shutdown hook to gracefully stop the servers and release resources,
 //     logging any errors encountered during resource cleanup.
 func main() {
+	// Handle panics gracefully
+	defer func() {
+		if r := recover(); r != nil {
+			resource.LoggerService.Error("Recovered from panic",
+				zap.Any("panic", r),
+				zap.String("stack", string(debug.Stack())),
+			)
+			// Print the stack trace
+			debug.PrintStack()
+		}
+	}()
+
 	// Create a background context for initialization tasks
 	ctx := context.Background()
 

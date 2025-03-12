@@ -29,8 +29,8 @@ func init() {
 		panic(err)
 	}
 
-	// Extract the root directory path by splitting on "/model"
-	dir := strings.Split(rootDir, "/model")
+	// Extract the root directory path by splitting on "/pkg"
+	dir := strings.Split(rootDir, "/pkg")
 	rootDir = dir[0]
 
 	// Load Kafka configuration from the specified TOML file

@@ -7,17 +7,17 @@ import (
 	"gorm.io/gorm"
 )
 
-type UserClient struct {
+type ClientUser struct {
 	db *gorm.DB
 }
 
-// NewUserClient creates a new UserClient instance.
+// NewUserClient creates a new ClientUser instance.
 //
 // It uses the global MySQLClient connection to interact with the database.
 //
-// Returns a new UserClient instance.
-func NewUserClient() *UserClient {
-	return &UserClient{
+// Returns a new ClientUser instance.
+func NewUserClient() *ClientUser {
+	return &ClientUser{
 		db: resource.MySQLClient,
 	}
 }
@@ -51,12 +51,13 @@ type User interface {
 // create the table in the database.
 //
 // Returns an error if the table creation fails.
-func (u *UserClient) CreateTb() error {
+func (c *ClientUser) CreateTb() error {
+
 	// Create the table in the database.
 	// The AutoMigrate method creates the table if it doesn't already exist.
 	// If the table already exists, the method returns nil.
 	// If the table creation fails, the method returns an error.
-	return u.db.Table("tb_user").AutoMigrate(&types.TbUser{})
+	return c.db.Table("tb_user").AutoMigrate(&types.TbUser{})
 }
 
 // GetUserNameByID retrieves the username associated with the given ID.
@@ -70,7 +71,7 @@ func (u *UserClient) CreateTb() error {
 // Returns:
 //   - A string containing the username associated with the given ID.
 //   - An error if the retrieval fails or the user is not found.
-func (u *UserClient) GetUserNameByID(id string) (string, error) {
+func (c *ClientUser) GetUserNameByID(id string) (string, error) {
 	// Retrieve the user information from the database
 	// The `Find` method is used to query the "tb_user" table and retrieve the
 	// user information associated with the given ID.
@@ -78,7 +79,7 @@ func (u *UserClient) GetUserNameByID(id string) (string, error) {
 	// should be retrieved.
 	// The `Find` method returns an error if the query fails or the user is not found.
 	var info types.TbUser
-	err := u.db.Table("tb_user").
+	err := c.db.Table("tb_user").
 		Where("id = ?", id).
 		Select("username").
 		Find(&info).

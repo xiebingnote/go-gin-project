@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	libconfig "github.com/xiebingnote/go-gin-project/library/config"
+	"github.com/xiebingnote/go-gin-project/library/config"
 	"github.com/xiebingnote/go-gin-project/library/resource"
 
 	"github.com/nsqio/go-nsq"
@@ -25,7 +25,7 @@ func InitNSQ(_ context.Context) {
 }
 
 // InitNSQClient initializes the NSQ client using the configuration provided
-// in the global libconfig.NsqConfig.
+// in the global config.NsqConfig.
 //
 // It first checks if the NSQLookupdAddress configuration is empty.
 //
@@ -36,7 +36,7 @@ func InitNSQ(_ context.Context) {
 //
 // If either of these functions fails, it logs an error and returns the error.
 func InitNSQClient() error {
-	if len(libconfig.NsqConfig.NSQ.LookupdAddress) == 0 {
+	if len(config.NsqConfig.NSQ.LookupdAddress) == 0 {
 		resource.LoggerService.Error(fmt.Sprintf("NSQLookupdAddress are nil"))
 		return fmt.Errorf("NSQLookupdAddress are nil")
 	}
@@ -57,7 +57,7 @@ func InitNSQClient() error {
 }
 
 // InitProducers initializes the NSQ producers using the configuration provided
-// in the global libconfig.NsqConfig.
+// in the global config.NsqConfig.
 //
 // It creates a new NSQ config with the specified dial timeout and maximum attempts.
 //
@@ -71,12 +71,12 @@ func InitNSQClient() error {
 //
 // If any of the pings fail, it logs an error and returns the error.
 func InitProducers() error {
-	config := nsq.NewConfig()
-	config.DialTimeout = libconfig.NsqConfig.NSQ.Producer.DialTimeout
-	config.MaxAttempts = uint16(libconfig.NsqConfig.NSQ.Producer.MaxAttempts)
+	nsqConfig := nsq.NewConfig()
+	nsqConfig.DialTimeout = config.NsqConfig.NSQ.Producer.DialTimeout
+	nsqConfig.MaxAttempts = uint16(config.NsqConfig.NSQ.Producer.MaxAttempts)
 
-	for _, addr := range libconfig.NsqConfig.NSQ.LookupdAddress {
-		producer, err := nsq.NewProducer(addr, config)
+	for _, addr := range config.NsqConfig.NSQ.Address {
+		producer, err := nsq.NewProducer(addr, nsqConfig)
 		if err != nil {
 			// Log an error if the producer fails to be created.
 			resource.LoggerService.Error(fmt.Sprintf("failed to create producer for address %s, err: %v", addr, err))
@@ -84,7 +84,7 @@ func InitProducers() error {
 		}
 
 		// Test the connection by sending a ping to the producer.
-		if err := producer.Ping(); err != nil {
+		if err = producer.Ping(); err != nil {
 			// Log an error if the ping fails.
 			resource.LoggerService.Error(fmt.Sprintf("producer ping failed for address %s, err: %v", addr, err))
 			return fmt.Errorf("producer ping failed for address %s: %w", addr, err)
@@ -109,21 +109,21 @@ func InitProducers() error {
 // Otherwise, it assigns the consumer to the global NsqConsumer resource.
 func InitConsumer() error {
 	// Create a new NSQ configuration
-	config := nsq.NewConfig()
+	nsqConfig := nsq.NewConfig()
 	// Set the maximum number of inflight messages.
-	config.MaxInFlight = libconfig.NsqConfig.NSQ.Consumer.MaxInFlight
+	nsqConfig.MaxInFlight = config.NsqConfig.NSQ.Consumer.MaxInFlight
 	// Set the maximum number of times the consumer will retry a message.
-	config.MaxAttempts = uint16(libconfig.NsqConfig.NSQ.Consumer.MaxAttempts)
+	nsqConfig.MaxAttempts = uint16(config.NsqConfig.NSQ.Consumer.MaxAttempts)
 	// Set the default requeue delay.
-	config.DefaultRequeueDelay = libconfig.NsqConfig.NSQ.Consumer.RequeueDelay
+	nsqConfig.DefaultRequeueDelay = config.NsqConfig.NSQ.Consumer.RequeueDelay
 	// Set the heartbeat interval.
-	config.HeartbeatInterval = libconfig.NsqConfig.NSQ.Consumer.HeartbeatInterval
+	nsqConfig.HeartbeatInterval = config.NsqConfig.NSQ.Consumer.HeartbeatInterval
 
 	// Create a new NSQ consumer with the specified topic, channel, and configuration
 	consumer, err := nsq.NewConsumer(
-		libconfig.NsqConfig.NSQ.Consumer.Topic,
-		libconfig.NsqConfig.NSQ.Consumer.Channel,
-		config,
+		config.NsqConfig.NSQ.Consumer.Topic,
+		config.NsqConfig.NSQ.Consumer.Channel,
+		nsqConfig,
 	)
 	if err != nil {
 		// Return the error if consumer creation fails
