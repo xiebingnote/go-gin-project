@@ -3,10 +3,6 @@
 # 卸载执行命令： docker-compose -f docker-compose.yml down
 
 version: '3'
-networks:
-  nsq_network:
-    driver: bridge
-
 services:
   mysql:
     container_name: mysql
@@ -91,8 +87,6 @@ services:
     ports:
       - "4160:4160"
       - "4161:4161"
-    networks:
-      - nsq_network
   nsqd:
     container_name: nsqd
     restart: always
@@ -104,8 +98,6 @@ services:
     ports:
       - "4150:9150"
       - "4151:4151"
-    networks:
-      - nsq_network
   nsqadmin:
     container_name: nsqadmin
     restart: always
@@ -115,8 +107,6 @@ services:
       - nsqlookupd
     ports:
       - "4171:4171"
-    networks:
-      - nsq_network
 
   zookeeper:
     container_name: zookeeper

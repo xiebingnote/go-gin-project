@@ -47,20 +47,19 @@ func init() {
 	dir := strings.Split(rootDir, "/pkg")
 	rootDir = dir[0]
 
-	// Load NSQ configuration from the specified TOML file
-	if _, err := toml.DecodeFile(rootDir+"/conf/log/log.toml", &config.LogConfig); err != nil {
+	// Load configuration from the specified TOML file
+	if _, err = toml.DecodeFile(rootDir+"/conf/log/log.toml", &config.LogConfig); err != nil {
 		panic("Failed to load log configuration file: " + err.Error())
 	}
-	if _, err := toml.DecodeFile(rootDir+"/conf/server.toml", &config.ServerConfig); err != nil {
+	if _, err = toml.DecodeFile(rootDir+"/conf/server.toml", &config.ServerConfig); err != nil {
 		panic("Failed to load server configuration file: " + err.Error())
 	}
-	if _, err := toml.DecodeFile(rootDir+"/conf/service/nsq.toml", &config.NsqConfig); err != nil {
+	if _, err = toml.DecodeFile(rootDir+"/conf/service/nsq.toml", &config.NsqConfig); err != nil {
 		panic("Failed to load nsq configuration file: " + err.Error())
 	}
 
-	// Initialize the Nsq service with a background context
+	// Initialize the logger and Nsq service with a background context
 	service.InitLogger(context.Background())
-
 	service.InitNSQ(context.Background())
 }
 
