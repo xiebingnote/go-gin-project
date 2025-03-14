@@ -34,9 +34,11 @@ func InitTDengine(_ context.Context) {
 //
 // If the connection cannot be established, it panics with an error message.
 func InitTDengineClient() error {
+	// Create the DSN (Data Source Name) for the TDengine client.
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%v)/%s", config.TDengineConfig.TDengine.UserName, config.TDengineConfig.TDengine.PassWord,
 		config.TDengineConfig.TDengine.Host, config.TDengineConfig.TDengine.Port, config.TDengineConfig.TDengine.Database)
 
+	// Open a connection to the TDengine database using the DSN.
 	db, err := sql.Open("taosSql", dsn)
 	if err != nil {
 		// The TDengine client cannot be initialized. Log the error message.

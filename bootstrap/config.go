@@ -24,7 +24,6 @@ import (
 // If any error occurs during the decoding of the configuration files,
 // the function will panic, providing the error message.
 func InitConfig(_ context.Context) {
-
 	// Load Log configuration
 	if _, err := toml.DecodeFile("./conf/log/log.toml", &config.LogConfig); err != nil {
 		// The log configuration file could not be decoded. Panic with the error message.

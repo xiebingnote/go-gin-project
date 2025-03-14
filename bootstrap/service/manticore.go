@@ -38,7 +38,6 @@ func InitManticore(_ context.Context) {
 //
 // If the configuration file decoding fails, the function returns an error.
 func InitManticoreClient() error {
-
 	// Create a new ManticoreSearch configuration
 	configuration := manticore.NewConfiguration()
 

@@ -123,6 +123,5 @@ func Login(c *gin.Context) {
 	}
 
 	// Return a success response with the JWT token
-	// Return the JWT token
 	resp.NewOKResp(c, token, reqID)
 }

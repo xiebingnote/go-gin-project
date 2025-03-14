@@ -36,6 +36,7 @@ func InitNSQ(_ context.Context) {
 //
 // If either of these functions fails, it logs an error and returns the error.
 func InitNSQClient() error {
+	// Check if the NSQLookupdAddress configuration is empty.
 	if len(config.NsqConfig.NSQ.LookupdAddress) == 0 {
 		resource.LoggerService.Error(fmt.Sprintf("NSQLookupdAddress are nil"))
 		return fmt.Errorf("NSQLookupdAddress are nil")
@@ -71,10 +72,14 @@ func InitNSQClient() error {
 //
 // If any of the pings fail, it logs an error and returns the error.
 func InitProducers() error {
+	// Create a new NSQ config
 	nsqConfig := nsq.NewConfig()
+	// Set the dial timeout.
 	nsqConfig.DialTimeout = config.NsqConfig.NSQ.Producer.DialTimeout
+	// Set the maximum number of attempts.
 	nsqConfig.MaxAttempts = uint16(config.NsqConfig.NSQ.Producer.MaxAttempts)
 
+	// Create a new NSQ producer for each address in the NSQLookupdAddress configuration
 	for _, addr := range config.NsqConfig.NSQ.Address {
 		producer, err := nsq.NewProducer(addr, nsqConfig)
 		if err != nil {

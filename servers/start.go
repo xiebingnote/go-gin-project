@@ -36,7 +36,6 @@ import (
 //   - adminSrv: The HTTP server for the admin interface.
 //   - errChan: A channel for receiving errors from the servers.
 func Start(_ context.Context) (mainSrv *http.Server, adminSrv *http.Server, errChan chan error) {
-
 	// Create an error channel with a buffer size of 2 to capture errors from both servers.
 	errChan = make(chan error, 2)
 
@@ -76,6 +75,7 @@ func Start(_ context.Context) (mainSrv *http.Server, adminSrv *http.Server, errC
 // Returns:
 //   - A pointer to one http.Server configured for the main interface.
 func newMainServer(cfg *config.ServerConfigEntry, handler http.Handler) *http.Server {
+	// Create a new HTTP server with the given configuration.
 	return &http.Server{
 		Addr:         cfg.HTTPServer.Listen,                     // Listen to the address for the main server.
 		Handler:      handler,                                   // HTTP handler for the main routes.
