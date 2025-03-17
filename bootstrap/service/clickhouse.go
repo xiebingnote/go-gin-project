@@ -38,12 +38,12 @@ func InitClickHouse(_ context.Context) {
 func InitClickHouseClient() error {
 	// Create a connection string using the configuration parameters.
 	// The format of the connection string is:
-	// tcp://<host>:<port>?username=<username>&password=<password>&database=<database>
-	dsn := fmt.Sprintf("tcp://%s:%v?username=%s&password=%s&database=%s",
-		config.ClickHouseConfig.ClickHouse.Host,
-		config.ClickHouseConfig.ClickHouse.Port,
+	// clickhouse://<username>:<password>@<host>:<port>/<database>
+	dsn := fmt.Sprintf("clickhouse://%s:%s@%s:%v/%s",
 		config.ClickHouseConfig.ClickHouse.Username,
 		config.ClickHouseConfig.ClickHouse.Password,
+		config.ClickHouseConfig.ClickHouse.Host,
+		config.ClickHouseConfig.ClickHouse.Port,
 		config.ClickHouseConfig.ClickHouse.Database,
 	)
 
