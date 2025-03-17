@@ -3,8 +3,10 @@ package manticore
 import (
 	"context"
 	"fmt"
-	manticore "github.com/manticoresoftware/manticoresearch-go"
+
 	"github.com/xiebingnote/go-gin-project/library/resource"
+
+	manticore "github.com/manticoresoftware/manticoresearch-go"
 )
 
 type Document struct {

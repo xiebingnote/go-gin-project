@@ -3,17 +3,28 @@ package elasticsearch
 import (
 	"context"
 	"fmt"
-	"github.com/BurntSushi/toml"
-	"github.com/xiebingnote/go-gin-project/bootstrap/service"
-	"github.com/xiebingnote/go-gin-project/library/config"
-	"github.com/xiebingnote/go-gin-project/library/resource"
-	"go.uber.org/zap"
 	"os"
 	"runtime/debug"
 	"strings"
 	"testing"
+
+	"github.com/xiebingnote/go-gin-project/bootstrap/service"
+	"github.com/xiebingnote/go-gin-project/library/config"
+	"github.com/xiebingnote/go-gin-project/library/resource"
+
+	"github.com/BurntSushi/toml"
+	"go.uber.org/zap"
 )
 
+// Init initializes the Elasticsearch service by loading the configuration
+// from a TOML file and decoding it into the ElasticSearchConfig struct.
+//
+// It then initializes the logger and Elasticsearch service with a background
+// context.
+//
+// If there is an error getting the current working directory, or the
+// Elasticsearch configuration file, cannot be decoded, the function will panic
+// with an error message.
 func init() {
 	// Handle panics gracefully
 	defer func() {
