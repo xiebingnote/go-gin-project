@@ -2,15 +2,15 @@
 # Elasticsearch configuration
 # Elasticsearch address
 Address = [
-    "http://127.0.0.1:8200"
+    "http://127.0.0.1:9200"
 ]
 
 # Elasticsearch authentication
 # Elasticsearch username
-UserName = "superuser"
+UserName = "elastic"
 
 # Elasticsearch password
-PassWord = "1234"
+PassWord = "123456"
 
 # Elasticsearch connection pool
 MaxIdleConns = 100
