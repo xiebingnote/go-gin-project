@@ -34,8 +34,8 @@ func InitElasticSearch(_ context.Context) {
 //
 // The transport is set up with:
 //
-// - MaxIdleConns: config.ElasticSearchConfig.ElasticSearch.MaxIdleConns
-// - MaxIdleConnsPerHost: config.ElasticSearchConfig.ElasticSearch.MaxIdleConnsPerHost
+// - MaxIdleConn's: config.ElasticSearchConfig.ElasticSearch.MaxIdleConn's
+// - MaxIdleConn'sPerHost: config.ElasticSearchConfig.ElasticSearch.MaxIdleConn'sPerHost
 // - IdleConnTimeout: config.ElasticSearchConfig.ElasticSearch.IdleConnTimeout * time.Second
 //
 // The client is set up with:

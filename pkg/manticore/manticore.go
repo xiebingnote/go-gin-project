@@ -24,7 +24,7 @@ type Document struct {
 func Insert() error {
 	// Create an insert document request with the specified table name and document fields
 	tbName := "products"
-	indexDoc := map[string]interface{}{"title": "Crossbody Bag with Tassel"}
+	indexDoc := map[string]interface{}{"title": "Cross body Bag with Tassel"}
 	indexReq := manticore.NewInsertDocumentRequest(tbName, indexDoc)
 
 	// Set the document ID to 1
