@@ -25,6 +25,8 @@
 17. 支持 manticore search 搜索引擎
 18. 支持 TDengine 时序数据库
 19. 支持 protobuf 序列化
+20. 支持 Makefile 编译
+21. 支持 Docker 容器化
 
 ### 待添加完善：
 
@@ -43,7 +45,7 @@
     ├── conf                    # 配置文件文件夹
     │   ├── log                 # 日志配置文件夹
     │   │   └── log.toml
-    │   ├── server.toml         # service服务配置文件
+    │   ├── server.toml         # server服务配置文件
     │   └── service             # service文件夹：各类服务组件配置
     ├── docker                  # docker相关配置
     │   ├── docker-compose.yml  # docker-compose配置

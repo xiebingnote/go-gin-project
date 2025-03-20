@@ -32,8 +32,8 @@ require (
 	github.com/manticoresoftware/manticoresearch-go v1.7.0
 	github.com/prometheus/client_golang v1.11.1
 	github.com/stretchr/testify v1.10.0
-	github.com/taosdata/driver-go/v3 v3.5.0
 	go.mongodb.org/mongo-driver v1.11.4
+	google.golang.org/protobuf v1.36.5
 	gorm.io/driver/postgres v1.5.11
 )
 
@@ -68,7 +68,6 @@ require (
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
@@ -133,7 +132,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20230822172742-b8732ec3820d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d // indirect
 	google.golang.org/grpc v1.59.0 // indirect
-	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/validator.v2 v2.0.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/sqlserver v1.5.4 // indirect
