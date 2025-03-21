@@ -191,7 +191,6 @@ services:
         soft: -1
         hard: -1
 
-  # TODO: 8.x 版本以上默认不支持elastic超级用户，容器无法启动成功，问题待完善
   kibana:
     image: docker.elastic.co/kibana/kibana:8.17.2
     container_name: kibana
