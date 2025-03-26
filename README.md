@@ -34,6 +34,8 @@
 
 ## 2、项目结构：
     .
+    ├── Dockerfile              # dockerfile
+    ├── Makefile                # makefile
     ├── README.md               # readme
     ├── bin                     # 编译后的可执行文件存放目录    
     │   └── bin.md
