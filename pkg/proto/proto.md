@@ -12,7 +12,7 @@
     在 ~/.zshrc 或 ~/.bash_profile 文件中添加如下内容：
     export PATH="$PATH:$(go env GOPATH)/bin"
     5、执行source命令：
-    source ~/.bash_profile
+    
     6、切换到对应的proto文件目录中，执行命令：
      protoc --proto_path=. --go_out=. *.proto
     

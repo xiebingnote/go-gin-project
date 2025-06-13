@@ -18,7 +18,8 @@ import (
 // client to the global RedisClient resource.
 func InitRedis(_ context.Context) {
 	if err := InitRedisClient(); err != nil {
-		// Panic if the Redis client cannot be initialized.
+		// Log an error message if the Redis connection cannot be established.
+		resource.LoggerService.Error(fmt.Sprintf("Failed to initialize Redis: %v", err))
 		panic(err.Error())
 	}
 }
@@ -38,14 +39,20 @@ func InitRedis(_ context.Context) {
 // - DialTimeout: The timeout for establishing a connection to the Redis server.
 // - ReadTimeout: The timeout for reading from the Redis server.
 // - WriteTimeout: The timeout for writing to the Redis server.
+// - PoolTimeout: The maximum wait time for a connection from the pool.
 //
 // Returns an error if the connection to the Redis server cannot be established.
 func InitRedisClient() error {
 	// Retrieve the Redis configuration
 	cfg := config.RedisConfig
 
+	// Validate the Redis configuration
+	if err := validateRedisConfig(cfg); err != nil {
+		return fmt.Errorf("invalid Redis configuration: %w", err)
+	}
+
 	// Initialize the Redis client with the specified options
-	RedisClient := redis.NewClient(&redis.Options{
+	redisClient := redis.NewClient(&redis.Options{
 		Addr:         cfg.Redis.Addr,
 		Password:     cfg.Redis.Password,
 		DB:           cfg.Redis.DB,
@@ -55,19 +62,64 @@ func InitRedisClient() error {
 		DialTimeout:  time.Duration(cfg.Redis.DialTimeout) * time.Millisecond,
 		ReadTimeout:  time.Duration(cfg.Redis.ReadTimeout) * time.Millisecond,
 		WriteTimeout: time.Duration(cfg.Redis.WriteTimeout) * time.Millisecond,
+		PoolTimeout:  time.Duration(cfg.Redis.DialTimeout) * time.Millisecond,
 	})
 
-	// Test the connection to the Redis server with a ping
+	// Create a context with timeout for the ping operation
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	// Ping the Redis server
-	if _, err := RedisClient.Ping(ctx).Result(); err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("redis ping failed: %v", err))
-		return fmt.Errorf("redis ping failed: %w", err)
+	if _, err := redisClient.Ping(ctx).Result(); err != nil {
+		return fmt.Errorf("failed to ping Redis server: %w", err)
 	}
 
 	// Store the Redis client instance in the global resource
-	resource.RedisClient = RedisClient
+	resource.RedisClient = redisClient
+	return nil
+}
+
+// validateRedisConfig validates the Redis configuration.
+//
+// The function checks the following:
+//
+//  1. The Redis configuration is not nil.
+//  2. The address is not empty.
+//  3. The connection pool settings are valid.
+//  4. The timeout settings are valid.
+//
+// If the configuration is invalid, the function returns an error.
+func validateRedisConfig(cfg *config.RedisConfigEntry) error {
+	// Check for nil configuration
+	if cfg == nil {
+		return fmt.Errorf("Redis configuration is nil")
+	}
+
+	// Check for empty address
+	if cfg.Redis.Addr == "" {
+		return fmt.Errorf("Redis address is empty")
+	}
+
+	// Check for invalid pool size
+	if cfg.Redis.PoolSize <= 0 {
+		return fmt.Errorf("invalid pool size")
+	}
+
+	// Check for invalid minimum idle connections
+	if cfg.Redis.MinIdleConns < 0 {
+		return fmt.Errorf("invalid minimum idle connections")
+	}
+
+	// Check for invalid max retries
+	if cfg.Redis.MaxRetries < 0 {
+		return fmt.Errorf("invalid max retries")
+	}
+
+	// Check for invalid timeout settings
+	if cfg.Redis.DialTimeout <= 0 || cfg.Redis.ReadTimeout <= 0 || cfg.Redis.WriteTimeout <= 0 {
+		return fmt.Errorf("invalid timeout settings")
+	}
+
 	return nil
 }
 
@@ -79,16 +131,20 @@ func InitRedisClient() error {
 //
 // Returns:
 //   - An error if the client close operation fails.
-//   - nil if the Redis client is nil or the connection is closed successfully.
+//   - nil if the Redis client is nil or the connection is closed successfully.ß
 func CloseRedis() error {
-	if resource.RedisClient != nil {
-		// Attempt to close the Redis client connection
-		if err := resource.RedisClient.Close(); err != nil {
-			// Return an error if closing the connection fails
-			resource.LoggerService.Error(fmt.Sprintf("failed to close Redis connection: %v", err))
-			return fmt.Errorf("failed to close Redis connection: %w", err)
-		}
+	if resource.RedisClient == nil {
+		// Redis client is nil, no connection to close
+		return nil
 	}
-	// Redis client is nil, no connection to close
+
+	// Attempt to close the Redis client connection
+	if err := resource.RedisClient.Close(); err != nil {
+		// Return an error if closing the connection fails
+		return fmt.Errorf("failed to close Redis connection: %w", err)
+	}
+
+	// Reset the global Redis client to nil
+	resource.RedisClient = nil
 	return nil
 }

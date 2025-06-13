@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -18,12 +19,18 @@ import (
 // InitMySQL initializes the MySQL database connection.
 //
 // This function calls InitMySQLClient to establish a connection to the MySQL
-// database using the configuration provided. If the connection cannot be
-// established, it panics with an error message.
+// database using the configuration provided.
+//
+// If the connection cannot be established, it panics with an error message.
 func InitMySQL(_ context.Context) {
-	// Attempt to initialize the MySQL client
 	if err := InitMySQLClient(); err != nil {
-		// Panic if there is an error initializing the MySQL client
+		// Log an error message if the MySQL connection cannot be established.
+		// The error message is logged with the gorm.Logger at the error level.
+		resource.LoggerService.Error(fmt.Sprintf("Failed to initialize MySQL: %v", err))
+
+		// Panic with the error message.
+		// The panic function will print the error message and the stack trace.
+		// The application will exit with a non-zero status code.
 		panic(err.Error())
 	}
 }
@@ -36,11 +43,17 @@ func InitMySQL(_ context.Context) {
 //
 // Returns an error if the connection cannot be established or configured.
 func InitMySQLClient() error {
-	// Retrieve the MySQL configuration
 	cfg := config.MySQLConfig
 
-	// Construct the DSN (Data Source Name) for MySQL connection
-	// The format is: user:password@tcp(host:port)/dbname?params
+	// Validate the MySQL configuration.
+	// See the documentation of the validateMySQLConfig function for more details.
+	if err := validateMySQLConfig(cfg); err != nil {
+		return fmt.Errorf("invalid MySQL configuration: %w", err)
+	}
+
+	// Construct the Data Source Name (DSN) for the MySQL connection.
+	// The DSN is in the format:
+	// username:password@tcp(host:port)/dbname?param1=value1&param2=value2
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?%s",
 		cfg.MySQL.Username,
 		cfg.MySQL.Password,
@@ -50,35 +63,103 @@ func InitMySQLClient() error {
 		cfg.MySQL.DSNParams,
 	)
 
-	// Initialize GORM with the MySQL DSN and custom logger
-	// The logger is configured with the MySQL configuration
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: newGormLogger(cfg),
-	})
-	if err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("gorm open failed: %v", err))
-		return fmt.Errorf("gorm open failed: %w", err)
+	// Configure the GORM logger.
+	// GORM uses a custom logger that logs messages at different levels.
+	// The logger is configured to log messages at the info level.
+	// The logger is also configured to log messages to the standard error.
+	gormConfig := &gorm.Config{
+		Logger:                 newGormLogger(cfg),
+		PrepareStmt:            true,
+		SkipDefaultTransaction: true,
 	}
 
-	// Get the generic database object to configure the connection pool
-	// The connection pool settings are configured with the MySQL configuration
+	// Attempt to open a connection to the MySQL database using GORM.
+	// If the connection cannot be established, an error is returned.
+	db, err := gorm.Open(mysql.Open(dsn), gormConfig)
+	if err != nil {
+		return fmt.Errorf("failed to open database connection: %w", err)
+	}
+
+	// Attempt to get the underlying *sql.DB object from the GORM database connection.
+	// If the underlying *sql.DB object cannot be obtained, an error is returned.
 	sqlDB, err := db.DB()
 	if err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("get sql.DB failed: %v", err))
-		return fmt.Errorf("get sql.DB failed: %w", err)
+		return fmt.Errorf("failed to get underlying *sql.DB: %w", err)
 	}
 
-	// Configure the connection pool parameters
+	// Configure the connection pool settings.
 	// The connection pool is configured to have the specified number of open
 	// and idle connections, and to timeout after the specified amount of time.
-	sqlDB.SetMaxOpenConns(cfg.MySQL.MaxOpenPerIP)
-	sqlDB.SetMaxIdleConns(cfg.MySQL.MaxIdlePerIP)
-	sqlDB.SetConnMaxLifetime(time.Duration(cfg.MySQL.ConnMaxLifeTime) * time.Millisecond)
+	configureConnectionPool(sqlDB, cfg)
 
-	// Assign the initialized GORM DB to the global MySQL client resource
-	// This is used by the application to interact with the MySQL database.
+	// Store the initialized GORM database connection in the resource package.
+	// The GORM database connection is a pointer to a GORM database connection.
 	resource.MySQLClient = db
 	return nil
+}
+
+// validateMySQLConfig validates the MySQL configuration.
+//
+// The function checks the following:
+//
+//  1. The MySQL configuration is not nil.
+//  2. The username and password are not empty.
+//  3. There is at least one MySQL host configuration.
+//  4. The connection pool settings are valid.
+//
+// If the configuration is invalid, the function returns an error.
+func validateMySQLConfig(cfg *config.MySQLConfigEntry) error {
+	if cfg == nil {
+		// The MySQL configuration is nil.
+		return fmt.Errorf("MySQL configuration is nil")
+	}
+
+	if cfg.MySQL.Username == "" || cfg.MySQL.Password == "" {
+		// The username or password is empty.
+		return fmt.Errorf("MySQL username or password is empty")
+	}
+
+	// Make sure there is at least one MySQL host configuration.
+	if len(cfg.Resource.Manual.Default) == 0 {
+		// No MySQL host configuration found.
+		return fmt.Errorf("no MySQL host configuration found")
+	}
+
+	// Make sure the connection pool settings are valid.
+	if cfg.MySQL.MaxOpenPerIP <= 0 || cfg.MySQL.MaxIdlePerIP <= 0 {
+		// Invalid connection pool settings.
+		return fmt.Errorf("invalid connection pool settings")
+	}
+
+	return nil
+}
+
+// configureConnectionPool configures the connection pool settings for the
+// underlying *sql.DB object. The connection pool is configured to have the
+// specified number of open and idle connections, and to timeout after the
+// specified amount of time.
+//
+// Parameters:
+//   - sqlDB: A pointer to the *sql.DB object to configure.
+//   - cfg: A pointer to the MySQL configuration containing the connection pool
+//     settings.
+func configureConnectionPool(sqlDB *sql.DB, cfg *config.MySQLConfigEntry) {
+	// Set the maximum number of open connections.
+	sqlDB.SetMaxOpenConns(cfg.MySQL.MaxOpenPerIP)
+
+	// Set the maximum number of idle connections.
+	sqlDB.SetMaxIdleConns(cfg.MySQL.MaxIdlePerIP)
+
+	// Set the connection lifetime in milliseconds. The connection will be closed
+	// after the specified amount of time.
+	sqlDB.SetConnMaxLifetime(time.Duration(cfg.MySQL.ConnMaxLifeTime) * time.Millisecond)
+
+	// Set the connection idle timeout in milliseconds. The connection will be
+	// closed after the specified amount of time if it is idle.
+	//
+	// The idle timeout is set to half of the connection lifetime to ensure that
+	// the connection is closed before the lifetime is reached.
+	sqlDB.SetConnMaxIdleTime(time.Duration(cfg.MySQL.ConnMaxLifeTime/2) * time.Millisecond)
 }
 
 // newGormLogger creates a new GORM logger with the specified configuration.
@@ -114,7 +195,7 @@ func newGormLogger(cfg *config.MySQLConfigEntry) logger.Interface {
 
 // CloseMySQL closes the MySQL database connection.
 //
-// It attempts to retrieve the underlying SQL DB connection from the global
+// This function attempts to retrieve the underlying SQL DB connection from the global
 // MySQL client resource. If the connection is successfully retrieved, it is
 // closed. The function returns an error if the connection cannot be closed
 // or if there is an error retrieving the SQL DB object.
@@ -124,23 +205,31 @@ func newGormLogger(cfg *config.MySQLConfigEntry) logger.Interface {
 //     SQL DB object.
 //   - nil if the MySQL client is nil or the connection is closed successfully.
 func CloseMySQL() error {
-	if resource.MySQLClient != nil {
-		// Retrieve the underlying SQL DB connection from GORM
-		sqlDB, err := resource.MySQLClient.DB()
-		if err != nil {
-			// Return an error if there is an issue getting the SQL DB object
-			resource.LoggerService.Error(fmt.Sprintf("failed to get sql.DB: %v", err))
-			return fmt.Errorf("failed to get sql.DB: %w", err)
-		}
-
-		// Attempt to close the MySQL connection
-		if err := sqlDB.Close(); err != nil {
-			// Return an error if closing the connection fails
-			resource.LoggerService.Error(fmt.Sprintf("failed to close MySQL connection: %v", err))
-			return fmt.Errorf("failed to close MySQL connection: %w", err)
-		}
+	// Check if the global MySQL client is initialized.
+	if resource.MySQLClient == nil {
+		// The MySQL client is nil, no connection to close.
+		return nil
 	}
 
-	// MySQL client is nil, no connection to close
+	// Attempt to retrieve the underlying SQL DB object from the global MySQL client.
+	// This is the same as calling resource.MySQLClient.DB()
+	sqlDB, err := resource.MySQLClient.DB()
+	if err != nil {
+		// Return an error if there is an issue getting the SQL DB object,
+		// This should not happen unless the resource has been tampered with
+		return fmt.Errorf("failed to get sql.DB: %w", err)
+	}
+
+	// Attempt to close the MySQL connection.
+	if err := sqlDB.Close(); err != nil {
+		// Return an error if closing the connection fails,
+		// This could happen if the connection is already closed
+		return fmt.Errorf("failed to close MySQL connection: %w", err)
+	}
+
+	// Reset the global MySQL client to nil.
+	resource.MySQLClient = nil
+
+	// Return nil to indicate success.
 	return nil
 }
