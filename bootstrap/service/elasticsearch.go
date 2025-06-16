@@ -12,106 +12,189 @@ import (
 	"github.com/olivere/elastic/v7"
 )
 
-// InitElasticSearch initializes the Elasticsearch (ElasticSearch) client using the configuration
-// specified in the./conf/elasticsearch.toml file.
-//
-// It reads the configuration parameters required to connect and authenticate
-// with the ElasticSearch cluster.
-//
-// The initialized ElasticSearch client is stored as a singleton in the resource package
-// for use throughout the application.
-// If the configuration file decoding fails, the function panics with an error.
-//
-// The function takes a context.Context parameter, but does not currently use it.
+// InitElasticSearch initializes the Elasticsearch client with the configuration
+// specified in the ./conf/elasticsearch.toml file.
 func InitElasticSearch(_ context.Context) {
 	if err := InitElasticSearchClient(); err != nil {
-		// The ElasticSearch client cannot be initialized. Panic with the error message.
+		// Log an error message if the Elasticsearch connection cannot be established
+		resource.LoggerService.Error(fmt.Sprintf("Failed to initialize Elasticsearch: %v", err))
 		panic(err.Error())
 	}
 }
 
-// InitElasticSearchClient initializes a new ElasticSearch client with connection pool.
+// InitElasticSearchClient initializes a new Elasticsearch client with connection pool.
 //
-// The transport is set up with:
+// The function performs the following steps:
+// 1. Validates the Elasticsearch configuration
+// 2. Configures the HTTP transport
+// 3. Creates an HTTP client
+// 4. Initializes the Elasticsearch client
+// 5. Tests the connection
+// 6. Stores the initialized client in the global resource
 //
-// - MaxIdleConn's: config.ElasticSearchConfig.ElasticSearch.MaxIdleConn's
-// - MaxIdleConn'sPerHost: config.ElasticSearchConfig.ElasticSearch.MaxIdleConn'sPerHost
-// - IdleConnTimeout: config.ElasticSearchConfig.ElasticSearch.IdleConnTimeout * time.Second
-//
-// The client is set up with:
-//
-// - SetURL: config.ElasticSearchConfig.ElasticSearch.Address
-// - SetBasicAuth: config.ElasticSearchConfig.ElasticSearch.Username, config.ElasticSearchConfig.ElasticSearch.Password
-// - SetHttpClient: the transport above
-// - SetSniff: false
-// - SetHealthcheck: false
-//
-// If the client initialization fails, the function will panic with the error.
+// Returns an error if the configuration is invalid, the connection cannot be established,
+// or any of the steps fail.
 func InitElasticSearchClient() error {
-	// Set the maximum number of idle (keep-alive) connections across all hosts.
-	httpTransport := &http.Transport{
-		MaxIdleConns: config.ElasticSearchConfig.ElasticSearch.MaxIdleConns,
+	cfg := config.ElasticSearchConfig
+
+	// Validate the Elasticsearch configuration
+	if err := ValidateElasticSearchConfig(cfg); err != nil {
+		return fmt.Errorf("invalid Elasticsearch configuration: %w", err)
 	}
 
-	// Set the maximum number of idle (keep-alive) connections per-host.
-	httpTransport.MaxIdleConnsPerHost = config.ElasticSearchConfig.ElasticSearch.MaxIdleConnsPerHost
+	// Configure the HTTP transport
+	httpTransport := ConfigureElasticSearchTransport(cfg)
 
-	// Set the time for which to keep an idle connection open waiting for a request.
-	httpTransport.IdleConnTimeout = time.Duration(config.ElasticSearchConfig.ElasticSearch.IdleConnTimeout) * time.Second
-
-	// Create an HTTP client with the above transport.
+	// Create an HTTP client with the configured transport
 	httpClient := &http.Client{
 		Transport: httpTransport,
+		Timeout:   30 * time.Second, // 设置默认超时时间
 	}
 
-	// Create a new ElasticSearch client with the above client.
+	// Initialize the Elasticsearch client
 	client, err := elastic.NewClient(
-		// Set the Elasticsearch URL to use.
-		elastic.SetURL(config.ElasticSearchConfig.ElasticSearch.Address...),
-
-		// Set the basic authentication username and password to use when connecting to Elasticsearch.
-		elastic.SetBasicAuth(config.ElasticSearchConfig.ElasticSearch.Username, config.ElasticSearchConfig.ElasticSearch.Password),
-
-		// Set the HTTP client to use when connecting to Elasticsearch.
+		elastic.SetURL(cfg.ElasticSearch.Address...),
+		elastic.SetBasicAuth(cfg.ElasticSearch.Username, cfg.ElasticSearch.Password),
 		elastic.SetHttpClient(httpClient),
-
-		// Set whether to enable sniffing.
 		elastic.SetSniff(false),
-
-		// Set whether to enable health checking.
 		elastic.SetHealthcheck(false),
+		elastic.SetRetrier(elastic.NewBackoffRetrier(elastic.NewExponentialBackoff(100*time.Millisecond, 30*time.Second))),
+		elastic.SetMaxRetries(3),
 	)
 	if err != nil {
-		return fmt.Errorf("fail to init Elasticsearch Client, err: %v", err)
+		return fmt.Errorf("failed to initialize Elasticsearch client: %w", err)
 	}
 
-	// Log a message to indicate a successful connection to Elasticsearch.
-	resource.LoggerService.Info(fmt.Sprintf("Successfully connected to Elasticsearch"))
+	// Test the connection
+	if err := TestElasticSearchConnection(client); err != nil {
+		return fmt.Errorf("failed to test Elasticsearch connection: %w", err)
+	}
 
-	// Store the initialized Elasticsearch client in the resource package.
+	// Store the initialized client in the global resource
 	resource.ElasticSearchClient = client
+	resource.LoggerService.Info("Successfully connected to Elasticsearch")
 
-	// Return nil to indicate successful initialization.
 	return nil
 }
 
-// CloseElasticSearch closes the ElasticSearch client connection.
+// ValidateElasticSearchConfig validates the Elasticsearch configuration.
 //
-// It checks if the global ElasticSearch client resource is initialized.
-// If it is, it attempts to close the client connection and returns an error
-// if the closure fails.
-// If successful, it returns nil.
+// The function checks the following:
+//
+//  1. The configuration is not nil
+//  2. Required connection parameters are present:
+//     - Address
+//     - Username
+//     - Password
+//  3. Connection pool settings are valid:
+//     - MaxIdleConns
+//     - MaxIdleConnsPerHost
+//     - IdleConnTimeout
+func ValidateElasticSearchConfig(cfg *config.ElasticSearchConfigEntry) error {
+	if cfg == nil {
+		return fmt.Errorf("elasticsearch configuration is nil")
+	}
+
+	// Check required connection parameters
+	if len(cfg.ElasticSearch.Address) == 0 {
+		return fmt.Errorf("elasticsearch address is empty")
+	}
+	if cfg.ElasticSearch.Username == "" {
+		return fmt.Errorf("elasticsearch username is empty")
+	}
+	if cfg.ElasticSearch.Password == "" {
+		return fmt.Errorf("elasticsearch password is empty")
+	}
+
+	// Check connection pool settings
+	if cfg.ElasticSearch.MaxIdleConns <= 0 {
+		return fmt.Errorf("invalid maximum idle connections")
+	}
+	if cfg.ElasticSearch.MaxIdleConnsPerHost <= 0 {
+		return fmt.Errorf("invalid maximum idle connections per host")
+	}
+	if cfg.ElasticSearch.IdleConnTimeout <= 0 {
+		return fmt.Errorf("invalid idle connection timeout")
+	}
+
+	return nil
+}
+
+// ConfigureElasticSearchTransport configures the HTTP transport for Elasticsearch.
+//
+// Parameters:
+//   - cfg: A pointer to the Elasticsearch configuration containing the connection
+//     pool settings.
 //
 // Returns:
-//   - An error if the client close operation fails.
-//   - nil if the ElasticSearch client is nil or the connection is closed successfully.
+//   - A configured *http.Transport instance.
+func ConfigureElasticSearchTransport(cfg *config.ElasticSearchConfigEntry) *http.Transport {
+	return &http.Transport{
+		MaxIdleConns:        cfg.ElasticSearch.MaxIdleConns,
+		MaxIdleConnsPerHost: cfg.ElasticSearch.MaxIdleConnsPerHost,
+		IdleConnTimeout:     time.Duration(cfg.ElasticSearch.IdleConnTimeout) * time.Second,
+		// 添加额外的传输配置
+		DisableKeepAlives:      false,
+		DisableCompression:     false,
+		MaxConnsPerHost:        cfg.ElasticSearch.MaxIdleConnsPerHost * 2,
+		MaxResponseHeaderBytes: 4096,
+		ResponseHeaderTimeout:  10 * time.Second,
+		ExpectContinueTimeout:  1 * time.Second,
+		TLSHandshakeTimeout:    10 * time.Second,
+	}
+}
+
+// TestElasticSearchConnection tests the Elasticsearch connection.
+//
+// The function takes an Elasticsearch client instance as a parameter and tests
+// the connection by executing a simple ping request. If the request fails,
+// the function returns an error.
+//
+// Parameters:
+//   - client: An Elasticsearch client instance to test.
+//
+// Returns:
+//   - An error if the ping request fails
+//   - nil if the ping request succeeds
+func TestElasticSearchConnection(client *elastic.Client) error {
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Test the connection
+	_, code, err := client.Ping(config.ElasticSearchConfig.ElasticSearch.Address[0]).Do(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to ping Elasticsearch: %w", err)
+	}
+	if code != 200 {
+		return fmt.Errorf("unexpected status code from Elasticsearch: %d", code)
+	}
+
+	return nil
+}
+
+// CloseElasticSearch closes the Elasticsearch connection.
+//
+// This function attempts to close the global Elasticsearch client connection.
+// If the connection is successfully closed, it returns nil. If the client is nil,
+// it also returns nil.
+//
+// Returns:
+//   - An error if there is an issue closing the connection
+//   - nil if the Elasticsearch client is nil or the connection is closed successfully
 func CloseElasticSearch() error {
-	// Check if the global ElasticSearch client resource is initialized.
-	if resource.ElasticSearchClient != nil {
-		// Attempt to close the ElasticSearch client connection
-		resource.ElasticSearchClient.Stop()
+	// Check if the global Elasticsearch client is initialized
+	if resource.ElasticSearchClient == nil {
+		// The Elasticsearch client is nil, no connection to close
 		return nil
 	}
-	// ElasticSearch client is nil, no connection to close
+
+	// Attempt to close the Elasticsearch connection
+	resource.ElasticSearchClient.Stop()
+
+	// Reset the global Elasticsearch client to nil
+	resource.ElasticSearchClient = nil
+
+	// Return nil to indicate success
 	return nil
 }

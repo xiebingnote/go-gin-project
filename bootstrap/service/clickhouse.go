@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/xiebingnote/go-gin-project/library/config"
 	"github.com/xiebingnote/go-gin-project/library/resource"
@@ -23,77 +24,164 @@ import (
 // If the configuration file decoding fails, the function panics with an error.
 func InitClickHouse(_ context.Context) {
 	if err := InitClickHouseClient(); err != nil {
-		// The ClickHouse client cannot be initialized. Panic with the error message.
+		// Log an error message if the ClickHouse connection cannot be established
+		resource.LoggerService.Error(fmt.Sprintf("Failed to initialize ClickHouse: %v", err))
 		panic(err.Error())
 	}
 }
 
-// InitClickHouseClient initializes the ClickHouse client using the configuration
-// specified in the ./conf/clickhouse.toml file.
+// InitClickHouseClient initializes the ClickHouse client using the configuration.
 //
-// It reads the configuration parameters required to connect and authenticate
-// with the ClickHouse database.
+// The function performs the following steps:
+// 1. Validates the ClickHouse configuration
+// 2. Constructs the DSN (Data Source Name)
+// 3. Initializes the database connection
+// 4. Configures the connection pool
+// 5. Tests the connection
+// 6. Stores the initialized client in the global resource
 //
-// If the connection fails, the function returns an error.
+// Returns an error if the configuration is invalid, the connection cannot be established,
+// or any of the steps fail.
 func InitClickHouseClient() error {
-	// Create a connection string using the configuration parameters.
-	// The format of the connection string is:
-	// clickhouse://<username>:<password>@<host>:<port>/<database>
+	cfg := config.ClickHouseConfig
+
+	// Validate the ClickHouse configuration
+	if err := ValidateClickHouseConfig(cfg); err != nil {
+		return fmt.Errorf("invalid ClickHouse configuration: %w", err)
+	}
+
+	// Create a connection string using the configuration parameters
 	dsn := fmt.Sprintf("clickhouse://%s:%s@%s:%v/%s",
-		config.ClickHouseConfig.ClickHouse.Username,
-		config.ClickHouseConfig.ClickHouse.Password,
-		config.ClickHouseConfig.ClickHouse.Host,
-		config.ClickHouseConfig.ClickHouse.Port,
-		config.ClickHouseConfig.ClickHouse.Database,
+		cfg.ClickHouse.Username,
+		cfg.ClickHouse.Password,
+		cfg.ClickHouse.Host,
+		cfg.ClickHouse.Port,
+		cfg.ClickHouse.Database,
 	)
 
-	// Attempt to open a GORM connection to the ClickHouse database.
-	// The gorm.Open function returns a pointer to a GORM database connection, or
-	// an error if the connection cannot be opened.
+	// Initialize the database connection
 	db, err := sql.Open("clickhouse", dsn)
 	if err != nil {
-		// Return an error if the connection cannot be opened.
 		return fmt.Errorf("failed to connect to ClickHouse: %w", err)
 	}
 
-	// Attempt to ping the ClickHouse database to check if the connection is
-	if err := db.Ping(); err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("Failed to ping ClickHouse: %v", err))
+	// Configure the connection pool with default settings
+	ConfigureClickHousePool(db)
+
+	// Test the connection
+	if err := TestClickHouseConnection(db); err != nil {
+		return fmt.Errorf("failed to test database connection: %w", err)
 	}
 
-	// Log a message to indicate a successful connection to ClickHouse.
-	resource.LoggerService.Info(fmt.Sprintf("ClickHouse client connected successfully"))
-
-	// Store the initialized ClickHouse client in the resource package.
-	// The ClickHouse client is a pointer to a GORM database connection.
+	// Store the initialized client in the global resource
 	resource.ClickHouseClient = db
+	resource.LoggerService.Info("ClickHouse client connected successfully")
 
-	// Return nil to indicate successful initialization.
 	return nil
 }
 
-// CloseClickHouse closes the ClickHouse connection and returns an error if the
-// closure fails.
+// ValidateClickHouseConfig validates the ClickHouse configuration.
 //
-// It checks if the global ClickHouse client resource is initialized.
-// If it is, it attempts to close the client connection and returns an error
-// if the closure fails. If successful, it returns nil.
+// The function checks the following:
 //
-// If the ClickHouse client is nil, it means there is no connection to close and
-// the function returns nil.
-//
-// Returns:
-//   - An error if the client close operation fails.
-//   - nil if the ClickHouse client is nil or the connection is closed successfully.
-func CloseClickHouse() error {
-	if resource.ClickHouseClient != nil {
-		// Attempt to close the ClickHouse connection
-		if err := resource.ClickHouseClient.Close(); err != nil {
-			// Return an error if closing the connection fails
-			return fmt.Errorf("failed to close ClickHouse connection: %w", err)
-		}
+//  1. The configuration is not nil
+//  2. Required connection parameters are present:
+//     - Host
+//     - Port
+//     - Username
+//     - Database
+func ValidateClickHouseConfig(cfg *config.ClickHouseConfigEntry) error {
+	if cfg == nil {
+		return fmt.Errorf("ClickHouse configuration is nil")
 	}
 
-	// ClickHouse client is nil, no connection to close
+	// Check required connection parameters
+	if cfg.ClickHouse.Host == "" {
+		return fmt.Errorf("ClickHouse host is empty")
+	}
+	if cfg.ClickHouse.Port <= 0 {
+		return fmt.Errorf("invalid ClickHouse port")
+	}
+	if cfg.ClickHouse.Username == "" {
+		return fmt.Errorf("ClickHouse username is empty")
+	}
+	if cfg.ClickHouse.Database == "" {
+		return fmt.Errorf("ClickHouse database name is empty")
+	}
+
+	return nil
+}
+
+// ConfigureClickHousePool configures the connection pool settings for the
+// underlying *sql.DB object with default values.
+//
+// Parameters:
+//   - db: A pointer to the *sql.DB object to configure.
+func ConfigureClickHousePool(db *sql.DB) {
+	// Set maximum number of open connections
+	db.SetMaxOpenConns(25)
+
+	// Set maximum number of idle connections
+	db.SetMaxIdleConns(5)
+
+	// Set connection lifetime to 5 minutes
+	db.SetConnMaxLifetime(5 * time.Minute)
+
+	// Set connection idle timeout to 1 minute
+	db.SetConnMaxIdleTime(1 * time.Minute)
+}
+
+// TestClickHouseConnection tests the database connection.
+//
+// The function takes a *sql.DB instance as a parameter and tests the connection
+// by executing a simple query. If the query fails, the function returns an error.
+//
+// Parameters:
+//   - db: A *sql.DB instance to test.
+//
+// Returns:
+//   - An error if the query fails
+//   - nil if the query succeeds
+func TestClickHouseConnection(db *sql.DB) error {
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Test the connection
+	var result int
+	if err := db.QueryRowContext(ctx, "SELECT 1").Scan(&result); err != nil {
+		return fmt.Errorf("connection test failed: %w", err)
+	}
+
+	return nil
+}
+
+// CloseClickHouse closes the ClickHouse connection.
+//
+// This function attempts to retrieve the underlying SQL DB connection from the global
+// ClickHouse client resource. If the connection is successfully retrieved, it is
+// closed. The function returns an error if the connection cannot be closed
+// or if there is an error retrieving the SQL DB object.
+//
+// Returns:
+//   - An error if there is an issue closing the connection or retrieving the
+//     SQL DB object.
+//   - nil if the ClickHouse client is nil or the connection is closed successfully.
+func CloseClickHouse() error {
+	// Check if the global ClickHouse client is initialized
+	if resource.ClickHouseClient == nil {
+		// The ClickHouse client is nil, no connection to close
+		return nil
+	}
+
+	// Attempt to close the ClickHouse connection
+	if err := resource.ClickHouseClient.Close(); err != nil {
+		return fmt.Errorf("failed to close ClickHouse connection: %w", err)
+	}
+
+	// Reset the global ClickHouse client to nil
+	resource.ClickHouseClient = nil
+
+	// Return nil to indicate success
 	return nil
 }
