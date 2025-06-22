@@ -3,13 +3,24 @@ package middleware
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var jwtSecret = []byte("1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+const (
+	// TokenExpirationDuration defines how long a token is valid
+	TokenExpirationDuration = 24 * time.Hour
+	// BearerPrefix is the prefix used in Authorization header
+	BearerPrefix = "Bearer "
+)
+
+var (
+	// jwtSecret should be loaded from configuration in production
+	jwtSecret = []byte("1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+)
 
 // AuthMiddlewareJWT is a middleware that verifies the JWT token in the request header.
 // It assumes that the token is in the format of "Bearer <token>".
@@ -18,25 +29,30 @@ var jwtSecret = []byte("1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 // The extracted userID can be accessed by calling c.Get("userID") in the subsequent handlers.
 func AuthMiddlewareJWT(c *gin.Context) {
 	// Get the token from the request header
-	token := c.GetHeader("Authorization")
-	if token == "" {
-		// Abort the request if the token is missing
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is required"})
 		return
 	}
+
+	// Check if the token has the correct prefix
+	if !strings.HasPrefix(authHeader, BearerPrefix) {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token format"})
+		return
+	}
+
+	// Extract the token without the "Bearer " prefix
+	token := strings.TrimPrefix(authHeader, BearerPrefix)
 
 	// Verify the token and extract the userID
 	userID, err := verifyToken(token)
 	if err != nil {
-		// Abort the request if the token is invalid
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": fmt.Sprintf("Invalid token: %v", err)})
 		return
 	}
 
 	// Store the userID in the gin context
 	c.Set("userID", userID)
-
-	// Continue to the next handler
 	c.Next()
 }
 
@@ -98,7 +114,8 @@ func verifyToken(token string) (uint, error) {
 func GenerateTokenJWT(userID uint) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": userID,
-		"exp":     time.Now().Add(24 * time.Hour).Unix(),
+		"exp":     time.Now().Add(TokenExpirationDuration).Unix(),
+		"iat":     time.Now().Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
