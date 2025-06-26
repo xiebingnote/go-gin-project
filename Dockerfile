@@ -2,11 +2,10 @@
 # This Dockerfile is used to build a Docker image for go-gin-project.
 FROM centos:latest
 
-# Maintainer information for the image
-MAINTAINER xiebing <xiebing@xxx.com>
-
 # Labels for the image to provide additional information
 LABEL maintainer="xiebing <xiebing@xxx.com>"
+LABEL description="Go Gin Project Docker Image"
+LABEL version="1.0"
 
 # Define the environment variable for the application name
 ENV APPNAME=go_gin_project
