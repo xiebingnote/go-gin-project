@@ -97,7 +97,13 @@ func InitConfig(_ context.Context) {
 	}
 
 	if _, err := toml.DecodeFile("./conf/service/tdengine.toml", &config.TDengineConfig); err != nil {
-		// The Redis configuration file could not be decoded. Panic with the error message.
-		panic("Failed to load Redis configuration file: " + err.Error())
+		// The TDengine configuration file could not be decoded. Panic with the error message.
+		panic("Failed to load TDengine configuration file: " + err.Error())
+	}
+
+	// Load Cron configuration
+	if _, err := toml.DecodeFile("./conf/service/cron.toml", &config.CronConfig); err != nil {
+		// The Cron configuration file could not be decoded. Panic with the error message.
+		panic("Failed to load Cron configuration file: " + err.Error())
 	}
 }

@@ -95,18 +95,18 @@ func InitElasticSearchClient() error {
 //  4. Address format validation
 func ValidateElasticSearchConfig(cfg *config.ElasticSearchConfigEntry) error {
 	if cfg == nil {
-		return fmt.Errorf("Elasticsearch configuration is nil")
+		return fmt.Errorf("elasticsearch configuration is nil")
 	}
 
 	// Check required connection parameters
 	if len(cfg.ElasticSearch.Address) == 0 {
-		return fmt.Errorf("Elasticsearch address list is empty")
+		return fmt.Errorf("elasticsearch address list is empty")
 	}
 
 	// Validate each address
 	for i, addr := range cfg.ElasticSearch.Address {
 		if addr == "" {
-			return fmt.Errorf("Elasticsearch address[%d] is empty", i)
+			return fmt.Errorf("elasticsearch address[%d] is empty", i)
 		}
 		// Basic URL format validation
 		if !isValidURL(addr) {
@@ -115,10 +115,10 @@ func ValidateElasticSearchConfig(cfg *config.ElasticSearchConfigEntry) error {
 	}
 
 	if cfg.ElasticSearch.Username == "" {
-		return fmt.Errorf("Elasticsearch username is empty")
+		return fmt.Errorf("elasticsearch username is empty")
 	}
 	if cfg.ElasticSearch.Password == "" {
-		return fmt.Errorf("Elasticsearch password is empty")
+		return fmt.Errorf("elasticsearch password is empty")
 	}
 
 	// Check connection pool settings

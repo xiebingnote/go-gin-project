@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/xiebingnote/go-gin-project/library/config"
@@ -16,7 +18,7 @@ import (
 func InitEtcd(_ context.Context) {
 	if err := InitEtcdClient(); err != nil {
 		// Log an error message if the Etcd connection cannot be established
-		resource.LoggerService.Error(fmt.Sprintf("Failed to initialize Etcd: %v", err))
+		resource.LoggerService.Error(fmt.Sprintf("failed to initialize etcd: %v", err))
 		panic(err.Error())
 	}
 }
@@ -37,7 +39,7 @@ func InitEtcdClient() error {
 
 	// Validate the Etcd configuration
 	if err := ValidateEtcdConfig(cfg); err != nil {
-		return fmt.Errorf("invalid Etcd configuration: %w", err)
+		return fmt.Errorf("invalid etcd configuration: %w", err)
 	}
 
 	// Prepare the etcd client configuration
@@ -51,12 +53,16 @@ func InitEtcdClient() error {
 
 	// Test the connection
 	if err := TestEtcdConnection(etcdClient, cfg); err != nil {
+		// Close the client if connection test fails to prevent resource leak
+		if closeErr := etcdClient.Close(); closeErr != nil {
+			resource.LoggerService.Error(fmt.Sprintf("failed to close etcd client during cleanup: %v", closeErr))
+		}
 		return fmt.Errorf("failed to test etcd connection: %w", err)
 	}
 
 	// Store the initialized client in the global resource
 	resource.EtcdClient = etcdClient
-	resource.LoggerService.Info("Successfully connected to Etcd")
+	resource.LoggerService.Info("successfully connected to etcd")
 
 	return nil
 }
@@ -81,6 +87,18 @@ func ValidateEtcdConfig(cfg *config.EtcdConfigEntry) error {
 	if len(cfg.Etcd.Endpoints) == 0 {
 		return fmt.Errorf("etcd endpoints are empty")
 	}
+
+	// Validate each endpoint
+	for i, endpoint := range cfg.Etcd.Endpoints {
+		if endpoint == "" {
+			return fmt.Errorf("etcd endpoint[%d] is empty", i)
+		}
+		// Basic URL format validation
+		if !isValidEtcdEndpoint(endpoint) {
+			return fmt.Errorf("invalid etcd endpoint[%d]: %s", i, endpoint)
+		}
+	}
+
 	if cfg.Etcd.Username == "" {
 		return fmt.Errorf("etcd username is empty")
 	}
@@ -88,9 +106,9 @@ func ValidateEtcdConfig(cfg *config.EtcdConfigEntry) error {
 		return fmt.Errorf("etcd password is empty")
 	}
 
-	// Check connection settings
+	// Check connection settings with detailed error messages
 	if cfg.Etcd.DialTimeout <= 0 {
-		return fmt.Errorf("invalid dial timeout")
+		return fmt.Errorf("invalid dial timeout: %v, must be greater than 0", cfg.Etcd.DialTimeout)
 	}
 
 	return nil
@@ -109,7 +127,7 @@ func ConfigureEtcdClient(cfg *config.EtcdConfigEntry) clientv3.Config {
 		DialTimeout: cfg.Etcd.DialTimeout * time.Second,
 		Username:    cfg.Etcd.Username,
 		Password:    cfg.Etcd.Password,
-		// 添加额外的客户端配置
+		// Additional client configuration
 		AutoSyncInterval:     30 * time.Second,
 		RejectOldCluster:     true,
 		PermitWithoutStream:  true,
@@ -138,10 +156,11 @@ func TestEtcdConnection(client *clientv3.Client, cfg *config.EtcdConfigEntry) er
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Test the connection
-	_, err := client.Status(ctx, cfg.Etcd.Endpoints[0])
+	// Test the connection using the first endpoint
+	endpoint := cfg.Etcd.Endpoints[0]
+	_, err := client.Status(ctx, endpoint)
 	if err != nil {
-		return fmt.Errorf("failed to get etcd status: %w", err)
+		return fmt.Errorf("failed to get etcd status from %s: %w", endpoint, err)
 	}
 
 	return nil
@@ -165,13 +184,41 @@ func CloseEtcd() error {
 
 	// Attempt to close the Etcd connection
 	if err := resource.EtcdClient.Close(); err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("Failed to close Etcd connection: %v", err))
+		resource.LoggerService.Error(fmt.Sprintf("failed to close etcd connection: %v", err))
 		return err
 	}
 
 	// Reset the global Etcd client to nil
 	resource.EtcdClient = nil
-	resource.LoggerService.Info("Successfully closed Etcd connection")
+	resource.LoggerService.Info("successfully closed etcd connection")
 
 	return nil
+}
+
+// isValidEtcdEndpoint validates if the given string is a valid etcd endpoint format.
+//
+// Parameters:
+//   - endpoint: The endpoint string to validate.
+//
+// Returns:
+//   - true if the endpoint is valid, false otherwise.
+func isValidEtcdEndpoint(endpoint string) bool {
+	if endpoint == "" {
+		return false
+	}
+
+	// Parse the URL
+	parsedURL, err := url.Parse(endpoint)
+	if err != nil {
+		return false
+	}
+
+	// Check if scheme and host are present
+	if parsedURL.Scheme == "" || parsedURL.Host == "" {
+		return false
+	}
+
+	// Check if scheme is http or https
+	scheme := strings.ToLower(parsedURL.Scheme)
+	return scheme == "http" || scheme == "https"
 }

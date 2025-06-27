@@ -1,0 +1,27 @@
+# Cron scheduler configuration
+
+[Cron]
+# Time zone for the scheduler (default: Local)
+# Examples: "UTC", "Asia/Shanghai", "America/New_York", "Europe/London"
+TimeZone = "Local"
+
+# Enable scheduler auto-start (default: true)
+AutoStart = true
+
+# Maximum number of concurrent jobs (default: 0 = unlimited)
+MaxConcurrentJobs = 0
+
+# Job execution timeout in seconds (default: 0 = no timeout)
+JobTimeout = 0
+
+# Enable job recovery on startup (default: false)
+EnableRecovery = false
+
+# Health check interval in seconds (default: 60)
+HealthCheckInterval = 60
+
+# Enable detailed logging (default: false)
+EnableDetailedLogging = false
+
+# Job history retention in hours (default: 24)
+JobHistoryRetention = 24

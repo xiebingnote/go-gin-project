@@ -125,10 +125,13 @@ func HookStd(_ context.Context) {
 //   - TDengine client
 //   - Cron jobs scheduler
 //
+// Parameters:
+//   - ctx: Context for the operation, used for timeouts and cancellation
+//
 // Returns:
 //   - A combined error if any resource cleanup fails, or nil if all resources
 //     are closed successfully.
-func Close() error {
+func Close(ctx context.Context) error {
 	var errs []error
 
 	// Close the ClickHouse connection.
@@ -156,13 +159,25 @@ func Close() error {
 	}
 
 	// Close the Manticore client.
-	err = service.CloseManticore()
+	err = service.CloseManticore(ctx)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	// Close the TDengine client.
+	err = service.CloseTDengine(ctx)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	// Close the Logger service (should be last to capture all shutdown logs).
+	err = service.CloseLogger(ctx)
 	if err != nil {
 		errs = append(errs, err)
 	}
 
 	// Close the MongoDB client.
-	err = service.CloseMongoDB()
+	err = service.CloseMongoDB(ctx)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -174,7 +189,25 @@ func Close() error {
 	}
 
 	// Close the NSQ connections.
-	err = service.CloseNsq()
+	err = service.CloseNsq(ctx)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	// Close the Casbin enforcer.
+	err = service.CloseCasbin(ctx)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	// Close the Cron scheduler.
+	err = service.CloseCron(ctx)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	// Close the Manticore client.
+	err = service.CloseManticore(ctx)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -186,13 +219,13 @@ func Close() error {
 	}
 
 	// Close the Redis client.
-	err = service.CloseRedis()
+	err = service.CloseRedis(ctx)
 	if err != nil {
 		errs = append(errs, err)
 	}
 
 	// Close the TDengine client.
-	err = service.CloseTDengine()
+	err = service.CloseTDengine(ctx)
 	if err != nil {
 		errs = append(errs, err)
 	}

@@ -1,20 +1,34 @@
 [Redis]
-# redis config
-# redis address
+# Redis server configuration
+# Redis server address
 Addr = "127.0.0.1:6379"
-# redis password
+# Redis password (empty for no authentication)
 Password = ""
-# redis db
+# Redis database number
 DB = 0
-# connection pool size
+
+# Connection pool configuration
+# Maximum number of connections in pool
 PoolSize = 10
-# connection pool min idle conns size
+# Minimum number of idle connections
 MinIdleConns = 5
-# redis max retries when operation fails
+# Maximum number of retries when operation fails
 MaxRetries = 3
-# dial timeout (ms)
+
+# Timeout configuration (in milliseconds)
+# Connection timeout
 DialTimeout = 5000
-# read timeout (ms)
+# Read timeout
 ReadTimeout = 3000
-# write timeout (ms)
+# Write timeout
 WriteTimeout = 3000
+# Pool timeout (time to wait for connection from pool)
+PoolTimeout = 4000
+# Idle connection timeout (0 = no timeout)
+IdleTimeout = 300000
+# Maximum connection age (0 = no limit)
+MaxConnAge = 0
+# Idle check frequency (0 = no idle check)
+IdleCheckFreq = 60000
+# Health check frequency (0 = no health check)
+HealthCheckFreq = 30000

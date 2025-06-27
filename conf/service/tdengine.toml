@@ -1,6 +1,30 @@
 [TDengine]
+# TDengine server configuration
+# TDengine server host
 Host = "127.0.0.1"
+# TDengine server port
 Port = 6030
+# TDengine username
 UserName = "root"
+# TDengine password
 PassWord = "taosdata"
+# TDengine database name
 Database = "test"
+
+# Connection configuration (in milliseconds)
+# Connection timeout
+ConnectTimeout = 10000
+# Read timeout
+ReadTimeout = 30000
+# Write timeout
+WriteTimeout = 30000
+
+# Connection pool configuration
+# Maximum number of open connections (0 = unlimited)
+MaxOpenConns = 10
+# Maximum number of idle connections
+MaxIdleConns = 5
+# Maximum connection lifetime (0 = no limit)
+ConnMaxLifetime = 3600000
+# Maximum connection idle time (0 = no limit)
+ConnMaxIdleTime = 300000

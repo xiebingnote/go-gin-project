@@ -23,7 +23,7 @@ import (
 func InitPostgresql(_ context.Context) {
 	if err := InitPostgresqlClient(); err != nil {
 		// Log an error message if the PostgreSQL connection cannot be established
-		resource.LoggerService.Error(fmt.Sprintf("Failed to initialize PostgreSQL: %v", err))
+		resource.LoggerService.Error(fmt.Sprintf("failed to initialize postgresql: %v", err))
 		panic(err.Error())
 	}
 }
@@ -45,18 +45,11 @@ func InitPostgresqlClient() error {
 
 	// Validate the PostgreSQL configuration
 	if err := ValidatePostgresqlConfig(cfg); err != nil {
-		return fmt.Errorf("invalid PostgreSQL configuration: %w", err)
+		return fmt.Errorf("invalid postgresql configuration: %w", err)
 	}
 
 	// Construct the DSN (Data Source Name) for PostgreSQL connection
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		cfg.Postgresql.Host,
-		cfg.Postgresql.Port,
-		cfg.Postgresql.User,
-		cfg.Postgresql.Password,
-		cfg.Postgresql.DBName,
-		cfg.Postgresql.SSLMode,
-	)
+	dsn := buildPostgresqlDSN(cfg)
 
 	// Configure GORM with custom settings
 	gormConfig := &gorm.Config{
@@ -82,11 +75,16 @@ func InitPostgresqlClient() error {
 
 	// Test the database connection
 	if err := TestPostgresqlConnection(db); err != nil {
+		// Close the connection if test fails to prevent resource leak
+		if closeErr := sqlDB.Close(); closeErr != nil {
+			resource.LoggerService.Error(fmt.Sprintf("failed to close postgresql connection during cleanup: %v", closeErr))
+		}
 		return fmt.Errorf("failed to test database connection: %w", err)
 	}
 
 	// Store the initialized GORM DB in the global resource
 	resource.PostgresqlClient = db
+	resource.LoggerService.Info("successfully connected to postgresql")
 	return nil
 }
 
@@ -107,35 +105,52 @@ func InitPostgresqlClient() error {
 //     - Maximum connection idle time
 func ValidatePostgresqlConfig(cfg *config.PostgresqlConfigEntry) error {
 	if cfg == nil {
-		return fmt.Errorf("PostgreSQL configuration is nil")
+		return fmt.Errorf("postgresql configuration is nil")
 	}
 
 	// Check required connection parameters
 	if cfg.Postgresql.Host == "" {
-		return fmt.Errorf("PostgreSQL host is empty")
+		return fmt.Errorf("postgresql host is empty")
 	}
-	if cfg.Postgresql.Port <= 0 {
-		return fmt.Errorf("invalid PostgreSQL port")
+	if cfg.Postgresql.Port <= 0 || cfg.Postgresql.Port > 65535 {
+		return fmt.Errorf("invalid postgresql port: %d, must be between 1 and 65535", cfg.Postgresql.Port)
 	}
 	if cfg.Postgresql.User == "" {
-		return fmt.Errorf("PostgreSQL user is empty")
+		return fmt.Errorf("postgresql user is empty")
 	}
 	if cfg.Postgresql.DBName == "" {
-		return fmt.Errorf("PostgreSQL database name is empty")
+		return fmt.Errorf("postgresql database name is empty")
 	}
 
-	// Check connection pool settings
+	// Validate SSL mode
+	validSSLModes := []string{"disable", "require", "verify-ca", "verify-full"}
+	isValidSSL := false
+	for _, mode := range validSSLModes {
+		if cfg.Postgresql.SSLMode == mode {
+			isValidSSL = true
+			break
+		}
+	}
+	if !isValidSSL {
+		return fmt.Errorf("invalid ssl mode: %s, must be one of: disable, require, verify-ca, verify-full", cfg.Postgresql.SSLMode)
+	}
+
+	// Check connection pool settings with detailed error messages
 	if cfg.Pool.MaxConns <= 0 {
-		return fmt.Errorf("invalid maximum connections")
+		return fmt.Errorf("invalid maximum connections: %d, must be greater than 0", cfg.Pool.MaxConns)
 	}
 	if cfg.Pool.MinConns < 0 {
-		return fmt.Errorf("invalid minimum connections")
+		return fmt.Errorf("invalid minimum connections: %d, must be non-negative", cfg.Pool.MinConns)
+	}
+	if cfg.Pool.MinConns > cfg.Pool.MaxConns {
+		return fmt.Errorf("minimum connections (%d) cannot be greater than maximum connections (%d)",
+			cfg.Pool.MinConns, cfg.Pool.MaxConns)
 	}
 	if cfg.Pool.MaxConnLifetime <= 0 {
-		return fmt.Errorf("invalid maximum connection lifetime")
+		return fmt.Errorf("invalid maximum connection lifetime: %d minutes, must be greater than 0", cfg.Pool.MaxConnLifetime)
 	}
 	if cfg.Pool.MaxConnIdleTime <= 0 {
-		return fmt.Errorf("invalid maximum connection idle time")
+		return fmt.Errorf("invalid maximum connection idle time: %d minutes, must be greater than 0", cfg.Pool.MaxConnIdleTime)
 	}
 
 	return nil
@@ -154,7 +169,7 @@ func ConfigurePostgresqlPool(sqlDB *sql.DB, cfg *config.PostgresqlConfigEntry) {
 	// Set maximum number of open connections
 	sqlDB.SetMaxOpenConns(cfg.Pool.MaxConns)
 
-	// Set maximum number of idle connections
+	// Set maximum number of idle connections (use MinConns as the idle connection count)
 	sqlDB.SetMaxIdleConns(cfg.Pool.MinConns)
 
 	// Set connection lifetime in minutes. The connection will be closed after
@@ -222,7 +237,7 @@ func ClosePostgresql() error {
 	if err := sqlDB.Close(); err != nil {
 		// Return an error if closing the connection fails,
 		// This could happen if the connection is already closed.
-		return fmt.Errorf("failed to close PostgreSQL connection: %w", err)
+		return fmt.Errorf("failed to close postgresql connection: %w", err)
 	}
 
 	// Reset the global PostgreSQL client to nil.
@@ -230,4 +245,22 @@ func ClosePostgresql() error {
 
 	// Return nil to indicate success.
 	return nil
+}
+
+// buildPostgresqlDSN constructs the Data Source Name (DSN) for PostgreSQL connection.
+//
+// Parameters:
+//   - cfg: A pointer to the PostgreSQL configuration containing connection details.
+//
+// Returns:
+//   - A properly formatted DSN string.
+func buildPostgresqlDSN(cfg *config.PostgresqlConfigEntry) string {
+	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		cfg.Postgresql.Host,
+		cfg.Postgresql.Port,
+		cfg.Postgresql.User,
+		cfg.Postgresql.Password,
+		cfg.Postgresql.DBName,
+		cfg.Postgresql.SSLMode,
+	)
 }

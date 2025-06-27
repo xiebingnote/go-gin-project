@@ -39,4 +39,7 @@ var (
 	
 	// TDengineConfig TDengine config entry
 	TDengineConfig *TDengineConfigEntry
+
+	// CronConfig cron config entry
+	CronConfig *CronConfigEntry
 )

@@ -6,8 +6,19 @@ Host = "127.0.0.1"
 # Port: MongoDB server port
 Port = 27017
 # UserName: MongoDB user name
-# PassWord: MongoDB password
 UserName = "root"
+# PassWord: MongoDB password
 PassWord = "123456"
 # DBName: MongoDB database name
 DBName = "admin"
+
+# Connection timeout in milliseconds (default: 10000ms = 10s)
+ConnectTimeout = 10000
+# Server selection timeout in milliseconds (default: 30000ms = 30s)
+ServerTimeout = 30000
+# Maximum connection pool size (default: 100)
+MaxPoolSize = 100
+# Minimum connection pool size (default: 0)
+MinPoolSize = 0
+# Maximum connection idle time in milliseconds (default: 0 = no limit)
+MaxConnIdleTime = 0

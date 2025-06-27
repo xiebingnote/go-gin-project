@@ -73,7 +73,10 @@ func main() {
 		},
 		func() {
 			// Perform cleanup of additional resources
-			if err := bootstrap.Close(); err != nil {
+			cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			if err := bootstrap.Close(cleanupCtx); err != nil {
 				// Log any errors encountered during resource cleanup
 				log.Println(fmt.Sprintf("❌ Resource cleanup failed: %v", err))
 				resource.LoggerService.Error(fmt.Sprintf("❌ Resource cleanup failed: %v", err))

@@ -31,13 +31,13 @@ var (
 //
 // Parameters:
 //   - ctx: context.Context used for managing request-scoped values
-//          and cancellation signals.
+//     and cancellation signals.
 //
 // Panics:
 //   - If the Kafka client connection cannot be initialized.
 func InitKafka(ctx context.Context) {
 	if err := InitKafkaClient(ctx); err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("初始化 Kafka 失败: %v", err))
+		resource.LoggerService.Error(fmt.Sprintf("failed to initialize kafka: %v", err))
 		panic(err.Error())
 	}
 }
@@ -59,20 +59,20 @@ func InitKafkaClient(ctx context.Context) error {
 
 	// Validate the Kafka configuration
 	if err := ValidateKafkaConfig(cfg); err != nil {
-		return fmt.Errorf("invalid Kafka configuration: %w", err)
+		return fmt.Errorf("invalid kafka configuration: %w", err)
 	}
 
 	// Parse the Kafka version
 	version, err := sarama.ParseKafkaVersion(cfg.Kafka.Version)
 	if err != nil {
-		return fmt.Errorf("invalid Kafka version: %w", err)
+		return fmt.Errorf("invalid kafka version: %w", err)
 	}
 
 	// Initialize the producer
 	producerConfig := ConfigureKafkaProducer(cfg, version)
 	resource.KafkaProducer, err = sarama.NewSyncProducer(cfg.Kafka.Brokers, producerConfig)
 	if err != nil {
-		return fmt.Errorf("failed to initialize Kafka producer: %w", err)
+		return fmt.Errorf("failed to initialize kafka producer: %w", err)
 	}
 
 	// Initialize the consumer
@@ -81,10 +81,12 @@ func InitKafkaClient(ctx context.Context) error {
 	if err != nil {
 		// If the consumer initialization fails, clean up the producer
 		if resource.KafkaProducer != nil {
-			resource.KafkaProducer.Close()
+			if closeErr := resource.KafkaProducer.Close(); closeErr != nil {
+				resource.LoggerService.Error(fmt.Sprintf("failed to close kafka producer during cleanup: %v", closeErr))
+			}
 			resource.KafkaProducer = nil
 		}
-		return fmt.Errorf("failed to initialize Kafka consumer: %w", err)
+		return fmt.Errorf("failed to initialize kafka consumer: %w", err)
 	}
 
 	// Initialize the consumer group
@@ -92,7 +94,7 @@ func InitKafkaClient(ctx context.Context) error {
 	if err != nil {
 		// If the consumer group initialization fails, clean up all the clients
 		cleanupKafkaClients()
-		return fmt.Errorf("failed to initialize Kafka consumer group: %w", err)
+		return fmt.Errorf("failed to initialize kafka consumer group: %w", err)
 	}
 
 	// Test the connection (using a lighter-weight approach)
@@ -104,7 +106,7 @@ func InitKafkaClient(ctx context.Context) error {
 	// Start the background health check
 	startKafkaHealthCheck(ctx)
 
-	resource.LoggerService.Info(fmt.Sprintf("successfully connected to Kafka | brokers: %v | version: %s",
+	resource.LoggerService.Info(fmt.Sprintf("successfully connected to kafka | brokers: %v | version: %s",
 		cfg.Kafka.Brokers, cfg.Kafka.Version))
 	return nil
 }
@@ -113,22 +115,29 @@ func InitKafkaClient(ctx context.Context) error {
 //
 // This function is used to clean up the Kafka clients when the initialization
 // of the Kafka clients fails. It closes the clients and sets them to nil.
+// All close errors are logged but do not prevent the cleanup from continuing.
 func cleanupKafkaClients() {
 	// Close the producer if it has been initialized
 	if resource.KafkaProducer != nil {
-		resource.KafkaProducer.Close()
+		if err := resource.KafkaProducer.Close(); err != nil {
+			resource.LoggerService.Error(fmt.Sprintf("failed to close kafka producer during cleanup: %v", err))
+		}
 		resource.KafkaProducer = nil
 	}
 
 	// Close the consumer if it has been initialized
 	if resource.KafkaConsumer != nil {
-		resource.KafkaConsumer.Close()
+		if err := resource.KafkaConsumer.Close(); err != nil {
+			resource.LoggerService.Error(fmt.Sprintf("failed to close kafka consumer during cleanup: %v", err))
+		}
 		resource.KafkaConsumer = nil
 	}
 
 	// Close the consumer group if it has been initialized
 	if resource.KafkaConsumerGroup != nil {
-		resource.KafkaConsumerGroup.Close()
+		if err := resource.KafkaConsumerGroup.Close(); err != nil {
+			resource.LoggerService.Error(fmt.Sprintf("failed to close kafka consumer group during cleanup: %v", err))
+		}
 		resource.KafkaConsumerGroup = nil
 	}
 }
@@ -156,6 +165,14 @@ func ValidateKafkaConfig(cfg *config.KafkaConfigEntry) error {
 	if len(cfg.Kafka.Brokers) == 0 {
 		return fmt.Errorf("kafka broker addresses are empty")
 	}
+
+	// Validate each broker address
+	for i, broker := range cfg.Kafka.Brokers {
+		if broker == "" {
+			return fmt.Errorf("kafka broker address[%d] is empty", i)
+		}
+	}
+
 	if cfg.Kafka.Version == "" {
 		return fmt.Errorf("kafka version is empty")
 	}
@@ -163,18 +180,24 @@ func ValidateKafkaConfig(cfg *config.KafkaConfigEntry) error {
 		return fmt.Errorf("kafka consumer group ID is empty")
 	}
 
-	// Check advanced settings
+	// Check advanced settings with detailed error messages
 	if cfg.Advanced.ProducerMaxRetry < 0 {
-		return fmt.Errorf("invalid maximum retry count for the producer")
+		return fmt.Errorf("invalid producer max retry count: %d, must be non-negative", cfg.Advanced.ProducerMaxRetry)
 	}
 	if cfg.Advanced.ConsumerSessionTimeout <= 0 {
-		return fmt.Errorf("invalid session timeout for the consumer")
+		return fmt.Errorf("invalid consumer session timeout: %d ms, must be greater than 0", cfg.Advanced.ConsumerSessionTimeout)
 	}
 	if cfg.Advanced.HeartbeatInterval <= 0 {
-		return fmt.Errorf("invalid heartbeat interval for the consumer")
+		return fmt.Errorf("invalid heartbeat interval: %d ms, must be greater than 0", cfg.Advanced.HeartbeatInterval)
 	}
 	if cfg.Advanced.MaxProcessingTime <= 0 {
-		return fmt.Errorf("invalid maximum processing time for the consumer")
+		return fmt.Errorf("invalid max processing time: %d ms, must be greater than 0", cfg.Advanced.MaxProcessingTime)
+	}
+
+	// Check logical consistency
+	if cfg.Advanced.HeartbeatInterval >= cfg.Advanced.ConsumerSessionTimeout {
+		return fmt.Errorf("heartbeat interval (%d ms) must be less than session timeout (%d ms)",
+			cfg.Advanced.HeartbeatInterval, cfg.Advanced.ConsumerSessionTimeout)
 	}
 
 	return nil
@@ -257,7 +280,7 @@ func ConfigureKafkaConsumer(cfg *config.KafkaConfigEntry, version sarama.KafkaVe
 	// Consumer settings
 	//
 	//  1. Set the initial offset to the oldest available message
-	//  2. Enable auto-commit with a interval of 1 second
+	//  2. Enable auto-commit with an interval of 1 second
 	//  3. Set the group rebalance strategy to round-robin
 	//  4. Set the session timeout to the value in the configuration file
 	//  5. Set the heartbeat interval to the value in the configuration file
@@ -301,27 +324,31 @@ func ConfigureKafkaConsumer(cfg *config.KafkaConfigEntry, version sarama.KafkaVe
 //   - nil if the connection test succeeds
 func TestKafkaConnection(cfg *config.KafkaConfigEntry) error {
 	// Create a temporary client to test the connection
-	config := sarama.NewConfig()
+	configKafka := sarama.NewConfig()
 	version, err := sarama.ParseKafkaVersion(cfg.Kafka.Version)
 	if err != nil {
-		return fmt.Errorf("failed to parse Kafka version: %w", err)
+		return fmt.Errorf("failed to parse kafka version: %w", err)
 	}
-	config.Version = version
+	configKafka.Version = version
 
 	// Configure the network settings
-	configureNetworkSettings(config)
+	configureNetworkSettings(configKafka)
 
 	// Create the temporary client
-	client, err := sarama.NewClient(cfg.Kafka.Brokers, config)
+	client, err := sarama.NewClient(cfg.Kafka.Brokers, configKafka)
 	if err != nil {
 		return fmt.Errorf("failed to create test client: %w", err)
 	}
-	defer client.Close()
+	defer func() {
+		if closeErr := client.Close(); closeErr != nil {
+			resource.LoggerService.Error(fmt.Sprintf("failed to close test client: %v", closeErr))
+		}
+	}()
 
 	// Test the connection by retrieving the cluster metadata
 	err = client.RefreshMetadata()
 	if err != nil {
-		return fmt.Errorf("failed to retrieve Kafka metadata: %w", err)
+		return fmt.Errorf("failed to retrieve kafka metadata: %w", err)
 	}
 
 	return nil
@@ -335,7 +362,7 @@ func TestKafkaConnection(cfg *config.KafkaConfigEntry) error {
 //
 // Returns:
 //   - an error if any of the close operations fail
-//   - nil if all of the close operations succeed
+//   - nil if all the close operations succeed
 func CloseKafka() error {
 	var errs []error
 
@@ -345,7 +372,7 @@ func CloseKafka() error {
 	// Close the producer
 	if resource.KafkaProducer != nil {
 		if err := resource.KafkaProducer.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to close Kafka producer: %w", err))
+			errs = append(errs, fmt.Errorf("failed to close kafka producer: %w", err))
 		}
 		resource.KafkaProducer = nil
 	}
@@ -353,7 +380,7 @@ func CloseKafka() error {
 	// Close the consumer
 	if resource.KafkaConsumer != nil {
 		if err := resource.KafkaConsumer.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to close Kafka consumer: %w", err))
+			errs = append(errs, fmt.Errorf("failed to close kafka consumer: %w", err))
 		}
 		resource.KafkaConsumer = nil
 	}
@@ -361,18 +388,18 @@ func CloseKafka() error {
 	// Close the consumer group
 	if resource.KafkaConsumerGroup != nil {
 		if err := resource.KafkaConsumerGroup.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to close Kafka consumer group: %w", err))
+			errs = append(errs, fmt.Errorf("failed to close kafka consumer group: %w", err))
 		}
 		resource.KafkaConsumerGroup = nil
 	}
 
 	// If any of the close operations fail, return a combined error
 	if len(errs) > 0 {
-		return fmt.Errorf("failed to close all Kafka connections: %v", errs)
+		return fmt.Errorf("failed to close all kafka connections: %v", errs)
 	}
 
 	// Log a success message to indicate that all connections have been closed
-	resource.LoggerService.Info("successfully closed all Kafka connections")
+	resource.LoggerService.Info("successfully closed all kafka connections")
 	return nil
 }
 
@@ -413,7 +440,7 @@ func kafkaHealthCheck(ctx context.Context) {
 	defer ticker.Stop() // Ensure the ticker is stopped when the function exits
 
 	// Log that the Kafka health check has started
-	resource.LoggerService.Info("Kafka health check started")
+	resource.LoggerService.Info("kafka health check started")
 
 	// Listen for ticker signals to perform health checks periodically
 	for {
@@ -422,15 +449,15 @@ func kafkaHealthCheck(ctx context.Context) {
 			// Perform the health check
 			if err := performHealthCheck(); err != nil {
 				// Log an error if the health check fails
-				resource.LoggerService.Error(fmt.Sprintf("Kafka health check failed: %v", err))
+				resource.LoggerService.Error(fmt.Sprintf("kafka health check failed: %v", err))
 				// Reconnection logic or alerting can be added here
 			} else {
 				// Log a debug message if the health check passes
-				resource.LoggerService.Debug("Kafka health check passed")
+				resource.LoggerService.Debug("kafka health check passed")
 			}
 		case <-ctx.Done():
 			// If the context is canceled, stop the health check
-			resource.LoggerService.Info("Kafka health check stopped")
+			resource.LoggerService.Info("kafka health check stopped")
 			return
 		}
 	}
