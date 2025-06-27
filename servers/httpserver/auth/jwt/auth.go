@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -125,7 +126,7 @@ func validatePassword(password string) error {
 		hasSpecial = false
 	)
 
-	// Use the unicode package to accurately check character types
+	// Use the Unicode package to accurately check character types
 	for _, char := range password {
 		switch {
 		case unicode.IsUpper(char):
@@ -257,15 +258,11 @@ func logAuthEvent(reqID, event, username string, success bool, err error) {
 // If the error is not a ValidationError, it logs the error with the appropriate message and returns a 400 Bad Request response with the error message.
 func handleValidationError(c *gin.Context, reqID string, err error) {
 	// If the error is a ValidationError, log the error with the appropriate message
-	if validationErr, ok := err.(ValidationError); ok {
+	var validationErr ValidationError
+	if errors.As(err, &validationErr) {
 		resource.LoggerService.Error(fmt.Sprintf("[%s] 验证失败: %s", reqID, validationErr.Message))
 		// Return a 400 Bad Request response with the error message
 		resp.NewErrResp(c, http.StatusBadRequest, validationErr.Message, reqID)
-	} else {
-		// If the error is not a ValidationError, log the error with the appropriate message
-		resource.LoggerService.Error(fmt.Sprintf("[%s] 验证错误: %v", reqID, err))
-		// Return a 400 Bad Request response with the error message
-		resp.NewErrResp(c, http.StatusBadRequest, err.Error(), reqID)
 	}
 }
 

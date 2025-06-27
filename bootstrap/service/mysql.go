@@ -54,14 +54,7 @@ func InitMySQLClient() error {
 	// Construct the Data Source Name (DSN) for the MySQL connection.
 	// The DSN is in the format:
 	// username:password@tcp(host:port)/dbname?param1=value1&param2=value2
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?%s",
-		cfg.MySQL.Username,
-		cfg.MySQL.Password,
-		cfg.Resource.Manual.Default[0].Host,
-		cfg.Resource.Manual.Default[0].Port,
-		cfg.MySQL.DBName,
-		cfg.MySQL.DSNParams,
-	)
+	dsn := buildDSN(cfg)
 
 	// Configure the GORM logger.
 	// GORM uses a custom logger that logs messages at different levels.
@@ -92,6 +85,11 @@ func InitMySQLClient() error {
 	// and idle connections, and to timeout after the specified amount of time.
 	configureConnectionPool(sqlDB, cfg)
 
+	// Test the database connection
+	if err := testConnection(sqlDB); err != nil {
+		return fmt.Errorf("failed to test database connection: %w", err)
+	}
+
 	// Store the initialized GORM database connection in the resource package.
 	// The GORM database connection is a pointer to a GORM database connection.
 	resource.MySQLClient = db
@@ -106,29 +104,57 @@ func InitMySQLClient() error {
 //  2. The username and password are not empty.
 //  3. There is at least one MySQL host configuration.
 //  4. The connection pool settings are valid.
+//  5. The database name is not empty.
+//  6. The host and port are valid.
 //
 // If the configuration is invalid, the function returns an error.
 func validateMySQLConfig(cfg *config.MySQLConfigEntry) error {
 	if cfg == nil {
-		// The MySQL configuration is nil.
 		return fmt.Errorf("MySQL configuration is nil")
 	}
 
-	if cfg.MySQL.Username == "" || cfg.MySQL.Password == "" {
-		// The username or password is empty.
-		return fmt.Errorf("MySQL username or password is empty")
+	if cfg.MySQL.Username == "" {
+		return fmt.Errorf("MySQL username is empty")
 	}
 
-	// Make sure there is at least one MySQL host configuration.
+	if cfg.MySQL.Password == "" {
+		return fmt.Errorf("MySQL password is empty")
+	}
+
+	if cfg.MySQL.DBName == "" {
+		return fmt.Errorf("MySQL database name is empty")
+	}
+
+	// Check host configuration
 	if len(cfg.Resource.Manual.Default) == 0 {
-		// No MySQL host configuration found.
 		return fmt.Errorf("no MySQL host configuration found")
 	}
 
-	// Make sure the connection pool settings are valid.
-	if cfg.MySQL.MaxOpenPerIP <= 0 || cfg.MySQL.MaxIdlePerIP <= 0 {
-		// Invalid connection pool settings.
-		return fmt.Errorf("invalid connection pool settings")
+	host := cfg.Resource.Manual.Default[0]
+	if host.Host == "" {
+		return fmt.Errorf("MySQL host is empty")
+	}
+
+	if host.Port <= 0 || host.Port > 65535 {
+		return fmt.Errorf("invalid MySQL port: %d, must be between 1 and 65535", host.Port)
+	}
+
+	// Check connection pool settings
+	if cfg.MySQL.MaxOpenPerIP <= 0 {
+		return fmt.Errorf("invalid max open connections: %d, must be greater than 0", cfg.MySQL.MaxOpenPerIP)
+	}
+
+	if cfg.MySQL.MaxIdlePerIP < 0 {
+		return fmt.Errorf("invalid max idle connections: %d, must be non-negative", cfg.MySQL.MaxIdlePerIP)
+	}
+
+	if cfg.MySQL.MaxIdlePerIP > cfg.MySQL.MaxOpenPerIP {
+		return fmt.Errorf("max idle connections (%d) cannot be greater than max open connections (%d)",
+			cfg.MySQL.MaxIdlePerIP, cfg.MySQL.MaxOpenPerIP)
+	}
+
+	if cfg.MySQL.ConnMaxLifeTime <= 0 {
+		return fmt.Errorf("invalid connection max lifetime: %d ms, must be greater than 0", cfg.MySQL.ConnMaxLifeTime)
 	}
 
 	return nil
@@ -231,5 +257,44 @@ func CloseMySQL() error {
 	resource.MySQLClient = nil
 
 	// Return nil to indicate success.
+	return nil
+}
+
+// buildDSN constructs the Data Source Name (DSN) for MySQL connection.
+// It properly formats the DSN string with all necessary components.
+//
+// Parameters:
+//   - cfg: A pointer to the MySQL configuration containing connection details.
+//
+// Returns:
+//   - A properly formatted DSN string.
+func buildDSN(cfg *config.MySQLConfigEntry) string {
+	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?%s",
+		cfg.MySQL.Username,
+		cfg.MySQL.Password,
+		cfg.Resource.Manual.Default[0].Host,
+		cfg.Resource.Manual.Default[0].Port,
+		cfg.MySQL.DBName,
+		cfg.MySQL.DSNParams,
+	)
+}
+
+// testConnection tests the database connection by performing a ping operation.
+//
+// Parameters:
+//   - sqlDB: A pointer to the *sql.DB object to test.
+//
+// Returns:
+//   - An error if the connection test fails, nil otherwise.
+func testConnection(sqlDB *sql.DB) error {
+	// Create a context with timeout for the connection test
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Perform a ping to test the connection
+	if err := sqlDB.PingContext(ctx); err != nil {
+		return fmt.Errorf("database ping failed: %w", err)
+	}
+
 	return nil
 }

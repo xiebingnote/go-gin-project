@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/xiebingnote/go-gin-project/library/config"
@@ -48,7 +50,7 @@ func InitElasticSearchClient() error {
 	// Create an HTTP client with the configured transport
 	httpClient := &http.Client{
 		Transport: httpTransport,
-		Timeout:   30 * time.Second, // 设置默认超时时间
+		Timeout:   30 * time.Second, // Set default timeout
 	}
 
 	// Initialize the Elasticsearch client
@@ -90,31 +92,48 @@ func InitElasticSearchClient() error {
 //     - MaxIdleConns
 //     - MaxIdleConnsPerHost
 //     - IdleConnTimeout
+//  4. Address format validation
 func ValidateElasticSearchConfig(cfg *config.ElasticSearchConfigEntry) error {
 	if cfg == nil {
-		return fmt.Errorf("elasticsearch configuration is nil")
+		return fmt.Errorf("Elasticsearch configuration is nil")
 	}
 
 	// Check required connection parameters
 	if len(cfg.ElasticSearch.Address) == 0 {
-		return fmt.Errorf("elasticsearch address is empty")
+		return fmt.Errorf("Elasticsearch address list is empty")
 	}
+
+	// Validate each address
+	for i, addr := range cfg.ElasticSearch.Address {
+		if addr == "" {
+			return fmt.Errorf("Elasticsearch address[%d] is empty", i)
+		}
+		// Basic URL format validation
+		if !isValidURL(addr) {
+			return fmt.Errorf("invalid Elasticsearch address[%d]: %s", i, addr)
+		}
+	}
+
 	if cfg.ElasticSearch.Username == "" {
-		return fmt.Errorf("elasticsearch username is empty")
+		return fmt.Errorf("Elasticsearch username is empty")
 	}
 	if cfg.ElasticSearch.Password == "" {
-		return fmt.Errorf("elasticsearch password is empty")
+		return fmt.Errorf("Elasticsearch password is empty")
 	}
 
 	// Check connection pool settings
 	if cfg.ElasticSearch.MaxIdleConns <= 0 {
-		return fmt.Errorf("invalid maximum idle connections")
+		return fmt.Errorf("invalid maximum idle connections: %d, must be greater than 0", cfg.ElasticSearch.MaxIdleConns)
 	}
 	if cfg.ElasticSearch.MaxIdleConnsPerHost <= 0 {
-		return fmt.Errorf("invalid maximum idle connections per host")
+		return fmt.Errorf("invalid maximum idle connections per host: %d, must be greater than 0", cfg.ElasticSearch.MaxIdleConnsPerHost)
+	}
+	if cfg.ElasticSearch.MaxIdleConnsPerHost > cfg.ElasticSearch.MaxIdleConns {
+		return fmt.Errorf("max idle connections per host (%d) cannot be greater than max idle connections (%d)",
+			cfg.ElasticSearch.MaxIdleConnsPerHost, cfg.ElasticSearch.MaxIdleConns)
 	}
 	if cfg.ElasticSearch.IdleConnTimeout <= 0 {
-		return fmt.Errorf("invalid idle connection timeout")
+		return fmt.Errorf("invalid idle connection timeout: %d seconds, must be greater than 0", cfg.ElasticSearch.IdleConnTimeout)
 	}
 
 	return nil
@@ -130,10 +149,9 @@ func ValidateElasticSearchConfig(cfg *config.ElasticSearchConfigEntry) error {
 //   - A configured *http.Transport instance.
 func ConfigureElasticSearchTransport(cfg *config.ElasticSearchConfigEntry) *http.Transport {
 	return &http.Transport{
-		MaxIdleConns:        cfg.ElasticSearch.MaxIdleConns,
-		MaxIdleConnsPerHost: cfg.ElasticSearch.MaxIdleConnsPerHost,
-		IdleConnTimeout:     time.Duration(cfg.ElasticSearch.IdleConnTimeout) * time.Second,
-		// 添加额外的传输配置
+		MaxIdleConns:           cfg.ElasticSearch.MaxIdleConns,
+		MaxIdleConnsPerHost:    cfg.ElasticSearch.MaxIdleConnsPerHost,
+		IdleConnTimeout:        time.Duration(cfg.ElasticSearch.IdleConnTimeout) * time.Second,
 		DisableKeepAlives:      false,
 		DisableCompression:     false,
 		MaxConnsPerHost:        cfg.ElasticSearch.MaxIdleConnsPerHost * 2,
@@ -157,17 +175,22 @@ func ConfigureElasticSearchTransport(cfg *config.ElasticSearchConfigEntry) *http
 //   - An error if the ping request fails
 //   - nil if the ping request succeeds
 func TestElasticSearchConnection(client *elastic.Client) error {
+	cfg := config.ElasticSearchConfig
+	if cfg == nil || len(cfg.ElasticSearch.Address) == 0 {
+		return fmt.Errorf("elasticsearch configuration or address is empty")
+	}
+
 	// Create a context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Test the connection
-	_, code, err := client.Ping(config.ElasticSearchConfig.ElasticSearch.Address[0]).Do(ctx)
+	// Test the connection using the first address
+	_, code, err := client.Ping(cfg.ElasticSearch.Address[0]).Do(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to ping Elasticsearch: %w", err)
+		return fmt.Errorf("failed to ping Elasticsearch at %s: %w", cfg.ElasticSearch.Address[0], err)
 	}
 	if code != 200 {
-		return fmt.Errorf("unexpected status code from Elasticsearch: %d", code)
+		return fmt.Errorf("unexpected status code from Elasticsearch at %s: %d", cfg.ElasticSearch.Address[0], code)
 	}
 
 	return nil
@@ -197,4 +220,32 @@ func CloseElasticSearch() error {
 
 	// Return nil to indicate success
 	return nil
+}
+
+// isValidURL validates if the given string is a valid URL format.
+//
+// Parameters:
+//   - urlStr: The URL string to validate.
+//
+// Returns:
+//   - true if the URL is valid, false otherwise.
+func isValidURL(urlStr string) bool {
+	if urlStr == "" {
+		return false
+	}
+
+	// Parse the URL
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return false
+	}
+
+	// Check if scheme and host are present
+	if parsedURL.Scheme == "" || parsedURL.Host == "" {
+		return false
+	}
+
+	// Check if scheme is http or https
+	scheme := strings.ToLower(parsedURL.Scheme)
+	return scheme == "http" || scheme == "https"
 }

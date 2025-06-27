@@ -62,7 +62,7 @@ func InitRedisClient() error {
 		DialTimeout:  time.Duration(cfg.Redis.DialTimeout) * time.Millisecond,
 		ReadTimeout:  time.Duration(cfg.Redis.ReadTimeout) * time.Millisecond,
 		WriteTimeout: time.Duration(cfg.Redis.WriteTimeout) * time.Millisecond,
-		PoolTimeout:  time.Duration(cfg.Redis.DialTimeout) * time.Millisecond,
+		PoolTimeout:  time.Duration(cfg.Redis.ReadTimeout) * time.Millisecond, // Use ReadTimeout as pool timeout
 	})
 
 	// Create a context with timeout for the ping operation
@@ -92,32 +92,44 @@ func InitRedisClient() error {
 func validateRedisConfig(cfg *config.RedisConfigEntry) error {
 	// Check for nil configuration
 	if cfg == nil {
-		return fmt.Errorf("Redis configuration is nil")
+		return fmt.Errorf("redis configuration is nil")
 	}
 
 	// Check for empty address
 	if cfg.Redis.Addr == "" {
-		return fmt.Errorf("Redis address is empty")
+		return fmt.Errorf("redis address is empty")
 	}
 
 	// Check for invalid pool size
 	if cfg.Redis.PoolSize <= 0 {
-		return fmt.Errorf("invalid pool size")
+		return fmt.Errorf("invalid pool size: %d, must be greater than 0", cfg.Redis.PoolSize)
 	}
 
 	// Check for invalid minimum idle connections
 	if cfg.Redis.MinIdleConns < 0 {
-		return fmt.Errorf("invalid minimum idle connections")
+		return fmt.Errorf("invalid minimum idle connections: %d, must be non-negative", cfg.Redis.MinIdleConns)
 	}
 
 	// Check for invalid max retries
 	if cfg.Redis.MaxRetries < 0 {
-		return fmt.Errorf("invalid max retries")
+		return fmt.Errorf("invalid max retries: %d, must be non-negative", cfg.Redis.MaxRetries)
 	}
 
 	// Check for invalid timeout settings
-	if cfg.Redis.DialTimeout <= 0 || cfg.Redis.ReadTimeout <= 0 || cfg.Redis.WriteTimeout <= 0 {
-		return fmt.Errorf("invalid timeout settings")
+	if cfg.Redis.DialTimeout <= 0 {
+		return fmt.Errorf("invalid dial timeout: %d ms, must be greater than 0", cfg.Redis.DialTimeout)
+	}
+	if cfg.Redis.ReadTimeout <= 0 {
+		return fmt.Errorf("invalid read timeout: %d ms, must be greater than 0", cfg.Redis.ReadTimeout)
+	}
+	if cfg.Redis.WriteTimeout <= 0 {
+		return fmt.Errorf("invalid write timeout: %d ms, must be greater than 0", cfg.Redis.WriteTimeout)
+	}
+
+	// Check for logical consistency
+	if cfg.Redis.MinIdleConns > cfg.Redis.PoolSize {
+		return fmt.Errorf("minimum idle connections (%d) cannot be greater than pool size (%d)",
+			cfg.Redis.MinIdleConns, cfg.Redis.PoolSize)
 	}
 
 	return nil
@@ -131,7 +143,7 @@ func validateRedisConfig(cfg *config.RedisConfigEntry) error {
 //
 // Returns:
 //   - An error if the client close operation fails.
-//   - nil if the Redis client is nil or the connection is closed successfully.ß
+//   - nil if the Redis client is nil or the connection is closed successfully.
 func CloseRedis() error {
 	if resource.RedisClient == nil {
 		// Redis client is nil, no connection to close
