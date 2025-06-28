@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"runtime/debug"
 	"strings"
@@ -29,12 +30,16 @@ func init() {
 	// Handle panics gracefully
 	defer func() {
 		if r := recover(); r != nil {
-			resource.LoggerService.Error("Recovered from panic",
-				zap.Any("panic", r),
-				zap.String("stack", string(debug.Stack())),
-			)
-			// Print the stack trace
-			debug.PrintStack()
+			if resource.LoggerService != nil {
+				resource.LoggerService.Error("Recovered from panic",
+					zap.Any("panic", r),
+					zap.String("stack", string(debug.Stack())),
+				)
+			} else {
+				// Fallback to standard log if logger is not available
+				log.Printf("Test panic recovered: %v\n", r)
+				log.Printf("Stack trace: %s\n", string(debug.Stack()))
+			}
 		}
 	}()
 

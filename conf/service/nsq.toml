@@ -37,4 +37,5 @@ MaxAttempts = 5
 RequeueDelay = 30
 # 心跳间隔
 # 单位：秒
-HeartbeatInterval = 30
+# 必须小于 ReadTimeout (10秒)
+HeartbeatInterval = 5

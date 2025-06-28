@@ -289,11 +289,15 @@ func validateCasbinEnforcer(_ context.Context, enforcer *casbin.Enforcer) error 
 // 3. Clears the global resource reference
 func CloseCasbin(ctx context.Context) error {
 	if resource.Enforcer == nil {
-		resource.LoggerService.Info("casbin enforcer is not initialized, nothing to close")
+		if resource.LoggerService != nil {
+			resource.LoggerService.Info("casbin enforcer is not initialized, nothing to close")
+		}
 		return nil
 	}
 
-	resource.LoggerService.Info("closing casbin enforcer")
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("closing casbin enforcer")
+	}
 
 	// Create timeout context for close operation
 	closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -314,11 +318,15 @@ func CloseCasbin(ctx context.Context) error {
 	select {
 	case err := <-done:
 		if err != nil {
-			resource.LoggerService.Error(fmt.Sprintf("failed to save casbin policy during close: %v", err))
+			if resource.LoggerService != nil {
+				resource.LoggerService.Error(fmt.Sprintf("failed to save casbin policy during close: %v", err))
+			}
 			return err
 		}
 	case <-closeCtx.Done():
-		resource.LoggerService.Error("casbin policy save timeout during close")
+		if resource.LoggerService != nil {
+			resource.LoggerService.Error("casbin policy save timeout during close")
+		}
 		return fmt.Errorf("casbin policy save timeout")
 	}
 

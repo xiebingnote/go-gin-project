@@ -287,11 +287,15 @@ func validateRedisConfig(cfg *config.RedisConfigEntry) error {
 // 3. Clears the global resource reference
 func CloseRedis(ctx context.Context) error {
 	if resource.RedisClient == nil {
-		resource.LoggerService.Info("redis client is not initialized, nothing to close")
+		if resource.LoggerService != nil {
+			resource.LoggerService.Info("redis client is not initialized, nothing to close")
+		}
 		return nil
 	}
 
-	resource.LoggerService.Info("closing redis client connection")
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("closing redis client connection")
+	}
 
 	// Create timeout context for close operation
 	closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -308,11 +312,15 @@ func CloseRedis(ctx context.Context) error {
 	select {
 	case err := <-done:
 		if err != nil {
-			resource.LoggerService.Error(fmt.Sprintf("failed to close redis connection: %v", err))
+			if resource.LoggerService != nil {
+				resource.LoggerService.Error(fmt.Sprintf("failed to close redis connection: %v", err))
+			}
 			return fmt.Errorf("failed to close redis connection: %w", err)
 		}
 	case <-closeCtx.Done():
-		resource.LoggerService.Error("redis close operation timeout")
+		if resource.LoggerService != nil {
+			resource.LoggerService.Error("redis close operation timeout")
+		}
 		return fmt.Errorf("redis close operation timeout")
 	}
 

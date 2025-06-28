@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"runtime/debug"
 	"time"
@@ -45,7 +46,9 @@ func main() {
 				)
 			} else {
 				// Fallback to standard log if logger is not available
-				debug.PrintStack()
+				// Use log.Printf instead of debug.PrintStack() to avoid potential panic
+				log.Printf("Application panic recovered: %v\n", r)
+				log.Printf("Stack trace: %s\n", string(debug.Stack()))
 			}
 		}
 	}()
@@ -96,7 +99,12 @@ func main() {
 //   - name: The name of the server being shut down (e.g. "main" or "admin").
 //   - srv: The HTTP server to be shut down.
 func shutdownServer(name string, srv *http.Server) {
-	resource.LoggerService.Info("Shutting down server", zap.String("server", name))
+	// Use safe logging that checks if logger is available
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("Shutting down server", zap.String("server", name))
+	} else {
+		log.Printf("Shutting down server: %s", name)
+	}
 
 	// Create a context with timeout to ensure the server has time to stop
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
@@ -104,12 +112,20 @@ func shutdownServer(name string, srv *http.Server) {
 
 	// Attempt to shut down the server gracefully
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		resource.LoggerService.Error("❌ Server shutdown failed",
-			zap.String("server", name),
-			zap.Error(err),
-		)
+		if resource.LoggerService != nil {
+			resource.LoggerService.Error("❌ Server shutdown failed",
+				zap.String("server", name),
+				zap.Error(err),
+			)
+		} else {
+			log.Printf("❌ Server shutdown failed (%s): %v", name, err)
+		}
 	} else {
-		resource.LoggerService.Info("Server stopped successfully", zap.String("server", name))
+		if resource.LoggerService != nil {
+			resource.LoggerService.Info("Server stopped successfully", zap.String("server", name))
+		} else {
+			log.Printf("Server stopped successfully: %s", name)
+		}
 	}
 }
 
@@ -124,8 +140,10 @@ func cleanupResources() {
 	defer cancel()
 
 	if err := bootstrap.Close(cleanupCtx); err != nil {
-		resource.LoggerService.Error("❌ Resource cleanup failed", zap.Error(err))
+		// Use standard log since Logger service may be closed
+		log.Printf("❌ Resource cleanup failed: %v", err)
 	} else {
-		resource.LoggerService.Info("✅ Resource cleanup completed successfully")
+		// Use standard log since Logger service is now closed
+		log.Println("✅ Resource cleanup completed successfully")
 	}
 }

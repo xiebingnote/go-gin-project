@@ -61,7 +61,7 @@ func MustInit(ctx context.Context) {
 	//// Initialize the Kafka
 	//service.InitKafka(ctx)
 	//
-	// Initialize the Manticore Search
+	//// Initialize the Manticore Search
 	//service.InitManticore(ctx)
 	//
 	//// Initialize the MongoDB database
@@ -82,9 +82,9 @@ func MustInit(ctx context.Context) {
 	//// Initialize the Redis database
 	//service.InitRedis(ctx)
 	//
-	//// Initialize the TDengine database
-	//service.InitTDengine(ctx)
-	//
+	// Initialize the TDengine database
+	// service.InitTDengine(ctx)  // Commented out - TDengine driver not available
+
 	//TaskStart(ctx)
 }
 
@@ -170,20 +170,8 @@ func Close(ctx context.Context) error {
 		errs = append(errs, err)
 	}
 
-	// Close the Logger service (should be last to capture all shutdown logs).
-	err = service.CloseLogger(ctx)
-	if err != nil {
-		errs = append(errs, err)
-	}
-
 	// Close the MongoDB client.
 	err = service.CloseMongoDB(ctx)
-	if err != nil {
-		errs = append(errs, err)
-	}
-
-	// Close the MySQL client.
-	err = service.CloseMySQL()
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -194,8 +182,14 @@ func Close(ctx context.Context) error {
 		errs = append(errs, err)
 	}
 
-	// Close the Casbin enforcer.
+	// Close the Casbin enforcer (before MySQL since it depends on it).
 	err = service.CloseCasbin(ctx)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	// Close the MySQL client.
+	err = service.CloseMySQL()
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -233,6 +227,12 @@ func Close(ctx context.Context) error {
 	// Stop all the cron jobs if the scheduler is initialized.
 	if resource.Corn != nil {
 		resource.Corn.StopJobs()
+	}
+
+	// Close the Logger service (should be last to capture all shutdown logs).
+	err = service.CloseLogger(ctx)
+	if err != nil {
+		errs = append(errs, err)
 	}
 
 	// If any error occurred during the resource cleanup, return the combined error.

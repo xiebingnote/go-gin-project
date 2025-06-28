@@ -253,14 +253,14 @@ func ConfigureKafkaProducer(cfg *config.KafkaConfigEntry, version sarama.KafkaVe
 	configSarama.Producer.Flush.MaxMessages = 100
 	configSarama.Producer.Flush.Bytes = 1024 * 1024 // 1MB
 
+	// Apply common network settings first
+	configureNetworkSettings(configSarama)
+
 	// Enable idempotency to avoid duplicate messages
 	configSarama.Producer.Idempotent = true
 
-	// Set max open requests to 1 for idempotency
+	// Set max open requests to 1 for idempotency (must be after configureNetworkSettings)
 	configSarama.Net.MaxOpenRequests = 1
-
-	// Apply common network settings
-	configureNetworkSettings(configSarama)
 
 	return configSarama
 }

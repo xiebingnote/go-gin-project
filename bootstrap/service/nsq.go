@@ -160,7 +160,8 @@ func InitProducers(ctx context.Context) error {
 
 	// Set additional configuration for better reliability
 	nsqConfig.WriteTimeout = 10 * time.Second
-	nsqConfig.ReadTimeout = 10 * time.Second
+	nsqConfig.ReadTimeout = 60 * time.Second  // Increase ReadTimeout to be larger than HeartbeatInterval
+	nsqConfig.HeartbeatInterval = 5 * time.Second  // Set HeartbeatInterval to be less than ReadTimeout
 
 	resource.LoggerService.Info(fmt.Sprintf("Initializing %d NSQ producers", len(config.NsqConfig.NSQ.Address)))
 
@@ -325,7 +326,9 @@ func InitConsumer(ctx context.Context) error {
 // 2. Stops the NSQ consumer gracefully with timeout
 // 3. Clears all global resource references
 func CloseNsq(ctx context.Context) error {
-	resource.LoggerService.Info("Starting NSQ client shutdown")
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("Starting NSQ client shutdown")
+	}
 
 	var errs []error
 

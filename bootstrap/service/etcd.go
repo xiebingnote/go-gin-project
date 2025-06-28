@@ -74,10 +74,11 @@ func InitEtcdClient() error {
 //  1. The configuration is not nil
 //  2. Required connection parameters are present:
 //     - Endpoints
-//     - Username
-//     - Password
 //  3. Connection settings are valid:
 //     - DialTimeout
+//  4. Authentication settings (optional):
+//     - If username is provided, password must also be provided
+//     - If password is provided, username must also be provided
 func ValidateEtcdConfig(cfg *config.EtcdConfigEntry) error {
 	if cfg == nil {
 		return fmt.Errorf("etcd configuration is nil")
@@ -99,11 +100,15 @@ func ValidateEtcdConfig(cfg *config.EtcdConfigEntry) error {
 		}
 	}
 
-	if cfg.Etcd.Username == "" {
-		return fmt.Errorf("etcd username is empty")
+	// Validate authentication settings (both must be provided or both must be empty)
+	hasUsername := cfg.Etcd.Username != ""
+	hasPassword := cfg.Etcd.Password != ""
+
+	if hasUsername && !hasPassword {
+		return fmt.Errorf("etcd username provided but password is empty")
 	}
-	if cfg.Etcd.Password == "" {
-		return fmt.Errorf("etcd password is empty")
+	if hasPassword && !hasUsername {
+		return fmt.Errorf("etcd password provided but username is empty")
 	}
 
 	// Check connection settings with detailed error messages
@@ -122,13 +127,11 @@ func ValidateEtcdConfig(cfg *config.EtcdConfigEntry) error {
 // Returns:
 //   - A configured clientv3.Config instance.
 func ConfigureEtcdClient(cfg *config.EtcdConfigEntry) clientv3.Config {
-	return clientv3.Config{
+	configEtcd := clientv3.Config{
 		Endpoints:   cfg.Etcd.Endpoints,
 		DialTimeout: cfg.Etcd.DialTimeout * time.Second,
-		Username:    cfg.Etcd.Username,
-		Password:    cfg.Etcd.Password,
 		// Additional client configuration
-		AutoSyncInterval:     30 * time.Second,
+		AutoSyncInterval:     0, // Disable auto sync to prevent "no such host" errors in single-node setup
 		RejectOldCluster:     true,
 		PermitWithoutStream:  true,
 		DialKeepAliveTime:    30 * time.Second,
@@ -136,6 +139,14 @@ func ConfigureEtcdClient(cfg *config.EtcdConfigEntry) clientv3.Config {
 		MaxCallSendMsgSize:   10 * 1024 * 1024, // 10MB
 		MaxCallRecvMsgSize:   10 * 1024 * 1024, // 10MB
 	}
+
+	// Only set authentication if username and password are provided
+	if cfg.Etcd.Username != "" && cfg.Etcd.Password != "" {
+		configEtcd.Username = cfg.Etcd.Username
+		configEtcd.Password = cfg.Etcd.Password
+	}
+
+	return configEtcd
 }
 
 // TestEtcdConnection tests the Etcd connection.
@@ -184,7 +195,9 @@ func CloseEtcd() error {
 
 	// Attempt to close the Etcd connection
 	if err := resource.EtcdClient.Close(); err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("failed to close etcd connection: %v", err))
+		if resource.LoggerService != nil {
+			resource.LoggerService.Error(fmt.Sprintf("failed to close etcd connection: %v", err))
+		}
 		return err
 	}
 

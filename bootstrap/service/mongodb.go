@@ -175,7 +175,9 @@ func CloseMongoDB(ctx context.Context) error {
 	// Clear the global reference
 	resource.MongoDBClient = nil
 
-	// Log successful disconnection
-	resource.LoggerService.Info("Successfully disconnected from MongoDB")
+	// Log successful disconnection (check if logger is still available)
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("Successfully disconnected from MongoDB")
+	}
 	return nil
 }

@@ -2,8 +2,8 @@
 # Redis server configuration
 # Redis server address
 Addr = "127.0.0.1:6379"
-# Redis password (empty for no authentication)
-Password = ""
+# Redis password (must match Docker container password)
+Password = "123456"
 # Redis database number
 DB = 0
 
@@ -15,20 +15,20 @@ MinIdleConns = 5
 # Maximum number of retries when operation fails
 MaxRetries = 3
 
-# Timeout configuration (in milliseconds)
+# Timeout configuration (Go duration format)
 # Connection timeout
-DialTimeout = 5000
+DialTimeout = "10s"
 # Read timeout
-ReadTimeout = 3000
+ReadTimeout = "10s"
 # Write timeout
-WriteTimeout = 3000
+WriteTimeout = "10s"
 # Pool timeout (time to wait for connection from pool)
-PoolTimeout = 4000
+PoolTimeout = "10s"
 # Idle connection timeout (0 = no timeout)
-IdleTimeout = 300000
+IdleTimeout = "5m"
 # Maximum connection age (0 = no limit)
-MaxConnAge = 0
+MaxConnAge = "0s"
 # Idle check frequency (0 = no idle check)
-IdleCheckFreq = 60000
+IdleCheckFreq = "1m"
 # Health check frequency (0 = no health check)
-HealthCheckFreq = 30000
+HealthCheckFreq = "30s"

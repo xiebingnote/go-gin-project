@@ -90,7 +90,9 @@ func (h *hook) Close(funcs ...func()) {
 	// Receive the signal that triggered the shutdown
 	sig := <-h.signalChan
 	log.Printf(fmt.Sprintf("🛑 Received signal: %s", sig))
-	resource.LoggerService.Info(fmt.Sprintf("🛑 Received signal: %s", sig))
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info(fmt.Sprintf("🛑 Received signal: %s", sig))
+	}
 
 	// Stop listening for signals to prevent the program from exiting
 	// immediately
@@ -123,7 +125,9 @@ func (h *hook) Close(funcs ...func()) {
 			case <-done:
 			case <-taskCtx.Done():
 				log.Println(fmt.Sprintf("⏰ Cleanup task timeout"))
-				resource.LoggerService.Error(fmt.Sprintf("⏰ Cleanup task timeout"))
+				if resource.LoggerService != nil {
+					resource.LoggerService.Error(fmt.Sprintf("⏰ Cleanup task timeout"))
+				}
 			}
 		}(f)
 	}
@@ -139,9 +143,13 @@ func (h *hook) Close(funcs ...func()) {
 	select {
 	case <-done:
 		log.Println(fmt.Sprintf("🎉 All cleanup tasks completed"))
-		resource.LoggerService.Info(fmt.Sprintf("🎉 All cleanup tasks completed"))
+		if resource.LoggerService != nil {
+			resource.LoggerService.Info(fmt.Sprintf("🎉 All cleanup tasks completed"))
+		}
 	case <-shutdownCtx.Done():
 		log.Println(fmt.Sprintf("⏰ Shutdown timeout, force exit"))
-		resource.LoggerService.Error(fmt.Sprintf("⏰ Shutdown timeout, force exit"))
+		if resource.LoggerService != nil {
+			resource.LoggerService.Error(fmt.Sprintf("⏰ Shutdown timeout, force exit"))
+		}
 	}
 }

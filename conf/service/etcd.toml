@@ -10,7 +10,7 @@ Endpoints = [
 # 单位：秒
 DialTimeout = 5
 
-# 用户名
-UserName = "root"
-# 密码
-PassWord = "123456"
+# 用户名 (当前 etcd 服务器未启用身份验证，留空)
+UserName = ""
+# 密码 (当前 etcd 服务器未启用身份验证，留空)
+PassWord = ""
