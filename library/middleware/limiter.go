@@ -114,7 +114,7 @@ func UserIDLimiter(rate limiter.Rate) gin.HandlerFunc {
 		instance := limiter.New(store, rate, limiter.WithClientIPHeader("X-Forwarded-For"))
 
 		// Get the rate limit context for the current request
-		context, err := instance.Get(c, limiterKey)
+		ctx, err := instance.Get(c, limiterKey)
 		if err != nil {
 			// Abort the request if there is an error getting the rate limit context
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
@@ -122,7 +122,7 @@ func UserIDLimiter(rate limiter.Rate) gin.HandlerFunc {
 		}
 
 		// Check if the rate limit has been exceeded
-		if context.Reached {
+		if ctx.Reached {
 			// Abort the request if the rate limit has been exceeded
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"error":  "Rate limit exceeded",

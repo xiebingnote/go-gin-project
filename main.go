@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"net/http"
 	"runtime/debug"
 	"time"
@@ -14,6 +12,15 @@ import (
 	"github.com/xiebingnote/go-gin-project/servers"
 
 	"go.uber.org/zap"
+)
+
+const (
+	// Server startup check timeout
+	startupCheckTimeout = 100 * time.Millisecond
+	// Server shutdown timeout
+	serverShutdownTimeout = 5 * time.Second
+	// Resource cleanup timeout
+	resourceCleanupTimeout = 10 * time.Second
 )
 
 // The main is the entry point of the application, responsible for initializing
@@ -31,12 +38,15 @@ func main() {
 	// Handle panics gracefully
 	defer func() {
 		if r := recover(); r != nil {
-			resource.LoggerService.Error("Recovered from panic",
-				zap.Any("panic", r),
-				zap.String("stack", string(debug.Stack())),
-			)
-			// Print the stack trace
-			debug.PrintStack()
+			if resource.LoggerService != nil {
+				resource.LoggerService.Error("Application panic recovered",
+					zap.Any("panic", r),
+					zap.String("stack", string(debug.Stack())),
+				)
+			} else {
+				// Fallback to standard log if logger is not available
+				debug.PrintStack()
+			}
 		}
 	}()
 
@@ -47,66 +57,75 @@ func main() {
 	bootstrap.MustInit(ctx)
 
 	// Start the main and admin HTTP servers, capturing any startup errors
-	mainSrv, adminSrv, errChan := servers.Start(ctx)
+	mainSrv, adminSrv, errChan := servers.Start()
 
 	// Monitor the error channel for any errors during server startup
 	select {
 	case err := <-errChan:
 		// Log a fatal error and terminate if server startup fails
-		log.Println(fmt.Sprintf("❌ Server startup failed: %v", err))
-		resource.LoggerService.Fatal(fmt.Sprintf("❌ Server startup failed: %v", err))
-	case <-time.After(100 * time.Millisecond): // Short delay to check for immediate errors
+		resource.LoggerService.Fatal("❌ Server startup failed", zap.Error(err))
+	case <-time.After(startupCheckTimeout):
 		// Log successful server startup with their respective addresses
-		log.Println(fmt.Sprintf("✅ Servers started successfully | Main: %s | Admin: %s", mainSrv.Addr, adminSrv.Addr))
-		resource.LoggerService.Info(fmt.Sprintf("✅ Servers started successfully | Main: %s | Admin: %s", mainSrv.Addr, adminSrv.Addr))
+		resource.LoggerService.Info("✅ Servers started successfully",
+			zap.String("main_server", mainSrv.Addr),
+			zap.String("admin_server", adminSrv.Addr),
+		)
 	}
 
 	// Configure a shutdown hook to cleanly stop servers and release resources
 	shutdown.NewHook().Close(
 		func() {
 			// Shutdown the main server gracefully
-			shutdownServer("Main", mainSrv)
+			shutdownServer("main", mainSrv)
 		},
 		func() {
 			// Shutdown the admin server gracefully
-			shutdownServer("Admin", adminSrv)
+			shutdownServer("admin", adminSrv)
 		},
 		func() {
 			// Perform cleanup of additional resources
-			cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			if err := bootstrap.Close(cleanupCtx); err != nil {
-				// Log any errors encountered during resource cleanup
-				log.Println(fmt.Sprintf("❌ Resource cleanup failed: %v", err))
-				resource.LoggerService.Error(fmt.Sprintf("❌ Resource cleanup failed: %v", err))
-			}
+			cleanupResources()
 		},
 	)
 }
 
-// shutdownServer closes the given HTTP server and logs any errors that occur.
-// It will block until the server has stopped or the given context is canceled.
-// If the context is canceled before the server has stopped, the server will be
-// interrupted and an error will be logged.
+// shutdownServer closes the given HTTP server gracefully and logs the result.
+// It creates a timeout context to ensure the server stops within a reasonable time.
 //
 // Parameters:
-//   - name: The name of the server being shut down (e.g. "Main" or "Admin").
+//   - name: The name of the server being shut down (e.g. "main" or "admin").
 //   - srv: The HTTP server to be shut down.
 func shutdownServer(name string, srv *http.Server) {
-	log.Println(fmt.Sprintf("Shutting down %s server...", name))
-	// Create a context with a 5-second timeout to ensure the server has time to stop
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	resource.LoggerService.Info("Shutting down server", zap.String("server", name))
+
+	// Create a context with timeout to ensure the server has time to stop
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
 	defer cancel()
 
-	// Attempt to shut down the server
+	// Attempt to shut down the server gracefully
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		// If there is an error, log the error and the server name
-		log.Println(fmt.Sprintf("❌ %s server shutdown error: %v", name, err))
-		resource.LoggerService.Error(fmt.Sprintf("❌ %s server shutdown error: %v ", name, err))
+		resource.LoggerService.Error("❌ Server shutdown failed",
+			zap.String("server", name),
+			zap.Error(err),
+		)
 	} else {
-		// Log the successful shutdown of the server
-		log.Println(fmt.Sprintf("✅ %s server stopped", name))
-		resource.LoggerService.Info(fmt.Sprintf("✅ %s server stopped", name))
+		resource.LoggerService.Info("Server stopped successfully", zap.String("server", name))
+	}
+}
+
+// cleanupResources releases resources allocated by the application.
+//
+// The function creates a timeout context for the cleanup operation and
+// attempts to close the resources allocated by the application. If the
+// operation fails, it logs an error. If the operation succeeds, it logs a
+// success message.
+func cleanupResources() {
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), resourceCleanupTimeout)
+	defer cancel()
+
+	if err := bootstrap.Close(cleanupCtx); err != nil {
+		resource.LoggerService.Error("❌ Resource cleanup failed", zap.Error(err))
+	} else {
+		resource.LoggerService.Info("✅ Resource cleanup completed successfully")
 	}
 }

@@ -1,71 +1,165 @@
 # 安装执行命令： docker-compose -f docker-compose.yml up -d
 # 启动单个服务执行命令： docker-compose up -d servername
 # 卸载执行命令： docker-compose -f docker-compose.yml down
+# 查看日志： docker-compose logs -f [service_name]
+# 重启服务： docker-compose restart [service_name]
 
-version: '3'
+version: '3.8'
+
+# 网络配置
+networks:
+  dev-network:
+    driver: bridge
+
+# 数据卷配置
+volumes:
+  mysql_data:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+  clickhouse_data:
+  elasticsearch_data:
+  manticore_data:
+  tdengine_data:
+
 services:
   mysql:
     container_name: mysql
-    restart: always
+    restart: unless-stopped
     image: mysql
     ports:
       - "3306:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: 123456
-      MYSQL_DATABASE: test
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-test}
+      MYSQL_USER: ${MYSQL_USER:-testuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-123456}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
 
   postgresql:
     container_name: postgresql
-    restart: always
+    restart: unless-stopped
     image: bitnami/postgresql
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 123456
-      POSTGRES_DB: test
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-123456}
+      POSTGRES_DB: ${POSTGRES_DB:-test}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   mongodb:
     container_name: mongodb
-    restart: always
+    restart: unless-stopped
     image: mongo
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: 123456
-      MONGO_INITDB_DATABASE: test
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-123456}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-test}
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongodb/init:/docker-entrypoint-initdb.d
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
 
   clickhouse:
     container_name: clickhouse
-    restart: always
-    image: clickhouse
+    restart: unless-stopped
+    image: clickhouse/clickhouse-server:latest
     ports:
       - "8123:8123"
       - "9000:9000"
       - "9009:9009"
     environment:
-      CLICKHOUSE_USER: root
-      CLICKHOUSE_PASSWORD: 123456
-      CLICKHOUSE_DB: test
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-root}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-123456}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-test}
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
     ulimits:
       nproc: 65535
       nofile:
         soft: 262144
         hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   redis:
     container_name: redis
-    restart: always
+    restart: unless-stopped
     image: redis
     ports:
       - "6379:6379"
-  #    command:
-  #      - redis-server --requirepass 123456
+    command: redis-server --requirepass ${REDIS_PASSWORD:-123456} --appendonly yes
+    volumes:
+      - redis_data:/data
+      - ./redis/config:/usr/local/etc/redis
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   etcd:
     container_name: etcd
-    restart: always
+    restart: unless-stopped
     image: bitnami/etcd
     ports:
       - "2379:2379"
@@ -78,68 +172,149 @@ services:
       ETCD_ADVERTISE_CLIENT_URLS: "http://etcd:2379"
       ETCD_INITIAL_ADVERTISE_PEER_URLS: "http://etcd:2380"
       ETCD_INITIAL_CLUSTER: "etcd=http://etcd:2380"
+    volumes:
+      - ./etcd/data:/bitnami/etcd/data
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   nsqlookupd:
     container_name: nsqlookupd
-    restart: always
+    restart: unless-stopped
     image: nsqio/nsq
     command: nsqlookupd
     ports:
       - "4160:4160"
       - "4161:4161"
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.1'
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4161/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   nsqd:
     container_name: nsqd
-    restart: always
+    restart: unless-stopped
     image: nsqio/nsq
-    #    command: nsqd --broadcast-address=127.0.0.1 --tcp-address=127.0.0.1:4150 --lookupd-tcp-address=nsqlookupd:4160
-    command: nsqd --broadcast-address=127.0.0.1  --lookupd-tcp-address=nsqlookupd:4160
+    command: nsqd --broadcast-address=127.0.0.1 --lookupd-tcp-address=nsqlookupd:4160
     depends_on:
       - nsqlookupd
     ports:
-      - "4150:9150"
+      - "4150:4150"
       - "4151:4151"
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4151/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   nsqadmin:
     container_name: nsqadmin
-    restart: always
+    restart: unless-stopped
     image: nsqio/nsq
     command: nsqadmin --lookupd-http-address=nsqlookupd:4161
     depends_on:
       - nsqlookupd
     ports:
       - "4171:4171"
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.1'
 
   zookeeper:
     container_name: zookeeper
-    restart: always
+    restart: unless-stopped
     image: bitnami/zookeeper
     ports:
       - "2181:2181"
     environment:
-      - ZOO_MY_ID= 1
+      - ZOO_MY_ID=1
       - ALLOW_ANONYMOUS_LOGIN=yes
+    volumes:
+      - ./zookeeper/data:/bitnami/zookeeper/data
+      - ./zookeeper/logs:/bitnami/zookeeper/logs
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "zkServer.sh", "status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   kafka:
     container_name: kafka
-    restart: always
-    image: bitnami/kafka
+    restart: unless-stopped
+    image: bitnami/kafka:3.8
     ports:
       - "9092:9092"
       - "9093:9093"
     environment:
+      # Kafka 配置
       - KAFKA_BROKER_ID=1
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
       - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,INTERNAL://:29092
       - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,INTERNAL://kafka:29092
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=INTERNAL
+      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
       - ALLOW_PLAINTEXT_LISTENER=yes
+    volumes:
+      - ./kafka/data:/bitnami/kafka/data
+      - ./kafka/logs:/bitnami/kafka/logs
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # manticore 默认没有用户密码，需自行创建
   manticore:
     container_name: manticore
-    restart: always
+    restart: unless-stopped
     image: manticoresearch/manticore
     ports:
       # mysql 兼容端口
@@ -149,10 +324,16 @@ services:
       # 集群端口
       - "9312:9312"
     volumes:
-      # 挂载初始化 SQL
-      - ./manticore-init.sql:/docker-entrypoint-initdb.d/init.sql
+      - manticore_data:/var/lib/manticore
     environment:
       - EXTRA=1
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
     ulimits:
       nproc: 65535
       nofile:
@@ -161,43 +342,93 @@ services:
       memlock:
         soft: -1
         hard: -1
+    healthcheck:
+      test: ["CMD", "mysql", "-h", "127.0.0.1", "-P", "9306", "-e", "SHOW STATUS"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   tdengine:
     image: tdengine/tdengine
     container_name: tdengine
-    restart: always
+    restart: unless-stopped
     ports:
       - "6030-6049:6030-6049"
       - "6000:6000"
       - "6041:6041"
+    volumes:
+      - tdengine_data:/var/lib/taos
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+    healthcheck:
+      test: ["CMD", "taos", "-s", "show databases;"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.2
+    image: elastic/elasticsearch:8.17.8
     container_name: elasticsearch
-    restart: always
+    restart: unless-stopped
     environment:
       - node.name=es01
       - cluster.name=es-cluster
       - discovery.type=single-node  # 单节点模式（开发环境）
       - bootstrap.memory_lock=true  # 锁定内存，防止 OOM
-      - xpack.security.enabled=false  # 开启安全认证（账号密码）
+      - xpack.security.enabled=false  # 关闭安全认证（开发环境）
       - xpack.security.http.ssl.enabled=false  # 关闭 SSL 加密
       - xpack.security.transport.ssl.enabled=false  # 关闭 SSL 加密
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"  # JVM 堆内存设置
     ports:
       - "9200:9200"
       - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
     ulimits:
       memlock:
         soft: -1
         hard: -1
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   kibana:
-    image: docker.elastic.co/kibana/kibana:8.17.2
+    image: elastic/kibana:8.17.8
     container_name: kibana
+    restart: unless-stopped
     ports:
       - "5601:5601"
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_NAME=kibana
+      - SERVER_HOST=0.0.0.0
+
     depends_on:
-      - elasticsearch
-    restart: always
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - dev-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

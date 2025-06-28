@@ -1,7 +1,6 @@
 package servers
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -28,14 +27,11 @@ import (
 // run in separate goroutines, and any errors encountered are sent to the
 // error channel.
 //
-// Parameters:
-//   - ctx: The context for controlling server lifecycle and cancellation.
-//
 // Returns:
 //   - mainSrv: The HTTP server for the main interface.
 //   - adminSrv: The HTTP server for the admin interface.
 //   - errChan: A channel for receiving errors from the servers.
-func Start(_ context.Context) (mainSrv *http.Server, adminSrv *http.Server, errChan chan error) {
+func Start() (mainSrv *http.Server, adminSrv *http.Server, errChan chan error) {
 	// Create an error channel with a buffer size of 2 to capture errors from both servers.
 	errChan = make(chan error, 2)
 
@@ -43,17 +39,17 @@ func Start(_ context.Context) (mainSrv *http.Server, adminSrv *http.Server, errC
 	mainSrv = newMainServer(config.ServerConfig, httpserver.NewServer())
 	go func() {
 		// Run the main server and send any errors to the error channel.
-		if err := runServer(mainSrv, "Main"); err != nil {
-			errChan <- fmt.Errorf("main server failed: %w", err)
+		if err := runServer(mainSrv, "main"); err != nil {
+			errChan <- err
 		}
 	}()
 
 	// Start the admin server with the provided configuration and handler.
-	adminSrv = newAdminServer(config.ServerConfig, NewAdminServer())
+	adminSrv = newAdminServer(config.ServerConfig, newAdminHandler())
 	go func() {
 		// Run the admin server and send any errors to the error channel.
-		if err := runServer(adminSrv, "Admin"); err != nil {
-			errChan <- fmt.Errorf("admin server failed: %w", err)
+		if err := runServer(adminSrv, "admin"); err != nil {
+			errChan <- err
 		}
 	}()
 
@@ -115,31 +111,32 @@ func newAdminServer(cfg *config.ServerConfigEntry, handler http.Handler) *http.S
 //
 // Parameters:
 //   - srv: The HTTP server to run.
-//   - name: The name of the server to a format in the error message.
+//   - name: The name of the server to format in the error message.
 //
 // Returns:
 //   - An error indicating the reason for the server failure.
 func runServer(srv *http.Server, name string) error {
 	// Attempt to start the server and listen for incoming requests.
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		// Return a formatted error message if the server fails to start.
-		resource.LoggerService.Error(fmt.Sprintf("%s server failed: %v", name, err))
+		// Log and return a formatted error message if the server fails to start.
+		errMsg := fmt.Sprintf("%s server failed: %v", name, err)
+		resource.LoggerService.Error(errMsg)
 		return fmt.Errorf("%s server failed: %w", name, err)
 	}
 	// Return nil if the server shuts down gracefully.
 	return nil
 }
 
-// NewAdminServer returns a new HTTP handler for the admin interface.
+// newAdminHandler returns a new HTTP handler for the admin interface.
 //
 // The returned handler registers the following endpoints:
 //   - /debug/pprof/ (via gin.WrapH(http.DefaultServeMux)): the pprof debug endpoints.
-//   - /metrics: a test endpoint that returns a 200 OK response with the text "Metrics endpoint".
+//   - /metrics: Prometheus metrics endpoint.
 //   - /test: a test endpoint that returns a 200 OK response with a UUID.
 //
 // The handler also uses the Gin recovery middleware to recover from panics and return a 500 Internal Server Error response.
 // The middleware.PrometheusMiddleware is used to register the Prometheus metrics endpoint.
-func NewAdminServer() http.Handler {
+func newAdminHandler() http.Handler {
 	// Create a new Gin router for handling admin routes.
 	router := gin.New()
 	// Use the Gin recovery middleware to recover from panics and return a 500 Internal Server Error response.

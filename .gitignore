@@ -1,4 +1,59 @@
+# IDE 文件
 /.idea
+.vscode/
+*.swp
+*.swo
+
+# 编译输出
 /bin
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# 测试输出
+*.test
+*.out
+
+# 依赖管理
+/vendor/
+
+# 日志文件
 /log
+*.log
+
+# 系统文件
 .DS_Store
+Thumbs.db
+
+# 环境变量文件（包含敏感信息）
+.env
+docker/.env
+
+# Docker 数据目录
+docker/mysql/data/
+docker/postgres/data/
+docker/mongodb/data/
+docker/redis/data/
+docker/clickhouse/data/
+docker/elasticsearch/data/
+docker/manticore/data/
+docker/tdengine/data/
+docker/etcd/data/
+docker/kafka/data/
+docker/kafka/logs/
+docker/zookeeper/data/
+docker/zookeeper/logs/
+
+# 备份文件
+docker/backups/
+backups/
+
+# 临时文件
+*.tmp
+*.temp
+
+# Go 相关
+go.work
+go.work.sum

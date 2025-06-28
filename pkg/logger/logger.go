@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -14,10 +15,11 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-type Option func(o *option)
+// Option defines a function type for configuring logger options
+type Option func(o *options)
 
-// option is the configuration options for the logger.
-type option struct {
+// options contains the configuration settings for the logger
+type options struct {
 	level          zapcore.Level
 	fields         map[string]string
 	timeLayout     string
@@ -25,73 +27,62 @@ type option struct {
 	logDir         string
 }
 
-// WithDebugLevel returns an Option that sets the logging level to
-// zapcore.DebugLevel.
+// WithLevel returns an Option that sets the logging level
 //
-// DebugLevel is used to log detailed information, typically of interest
-// only when diagnosing problems.
+// The logging level is an inclusive threshold. Messages with a level below
+// the specified level will be discarded. Valid levels are Debug, Info, Warn,
+// Error, and DPanic.
 //
-// Example:
+// This option is mutually exclusive with WithDebugLevel, WithInfoLevel,
+// WithWarnLevel, and WithErrorLevel.
+func WithLevel(level zapcore.Level) Option {
+	return func(opt *options) {
+		opt.level = level
+	}
+}
+
+// WithDebugLevel sets the logging level to Debug
 //
-//	 logger, err:= logger.NewJsonLogger(
-//			logger.WithDebugLevel(),
-//		)
-//
-// This will log all messages with a level of Debug and above.
+// This option sets the logging level to Debug, which will log all messages with
+// level Debug and above. Only logs with level Debug and above will be printed.
 func WithDebugLevel() Option {
-	return func(opt *option) {
-		opt.level = zapcore.DebugLevel
-	}
+	return WithLevel(zapcore.DebugLevel)
 }
 
-// WithWarnLevel returns an Option that sets the logging level to
-// zapcore.WarnLevel.
+// WithInfoLevel sets the logging level to Info
 //
-// WarnLevel is a level that is used when an event has occurred that may
-// potentially cause a problem.
+// This option sets the logging level to Info, which will log all messages with
+// level Info and above. Only logs with level Info and above will be printed.
+func WithInfoLevel() Option {
+	return WithLevel(zapcore.InfoLevel)
+}
+
+// WithWarnLevel sets the logging level to Warn
 //
-// Example:
-//
-//	 logger, err:= logger.NewJsonLogger(
-//			logger.WithWarnLevel(),
-//		)
+// This option sets the logging level to Warn, which will log all messages with
+// level Warn and above. Only logs with level Warn and above will be printed.
 func WithWarnLevel() Option {
-	return func(opt *option) {
-		opt.level = zapcore.WarnLevel
-	}
+	return WithLevel(zapcore.WarnLevel)
 }
 
-// WithErrorLevel returns an Option that sets the logging level to
-// zapcore.ErrorLevel.
+// WithErrorLevel sets the logging level to Error
 //
-// ErrorLevel is a level used when an error has occurred.
-//
-// Example:
-//
-//	 logger, err:= logger.NewJsonLogger(
-//			logger.WithErrorLevel(),
-//		)
+// This option sets the logging level to Error, which is the highest level of
+// logging. Only logs with level Error and above will be printed.
 func WithErrorLevel() Option {
-	return func(opt *option) {
-		opt.level = zapcore.ErrorLevel
-	}
+	return WithLevel(zapcore.ErrorLevel)
 }
 
-// WithField returns an Option that sets a field to the logger.
+// WithField returns an Option that adds a single key-value pair as a field to the logger.
 //
-// The key argument specifies the key of the field, and the val argument
-// specifies the value of the field.
+// Parameters:
+//   - key: The field key to be added to the logger.
+//   - val: The field value to be associated with the key.
 //
-// If the key is already present in the logger, the value will be
-// overwritten.
-//
-// Example:
-//
-//	 logger, err:= logger.NewJsonLogger(
-//			logger.WithField("service", "myapp"),
-//		)
+// The function ensures that the fields map is initialized if it is nil
+// and then adds the provided key-value pair to the map.
 func WithField(key, val string) Option {
-	return func(opt *option) {
+	return func(opt *options) {
 		if opt.fields == nil {
 			opt.fields = make(map[string]string)
 		}
@@ -99,87 +90,164 @@ func WithField(key, val string) Option {
 	}
 }
 
-// WithTimeLayout returns an Option that sets the time layout for the logger.
+// WithFields returns an Option that adds a map of key-value pairs as fields to the logger.
 //
-// The time layout is used to format the time field in the log messages.
-// The time layout must be a valid time layout string as specified in the
-// time package.
+// Parameters:
+//   - fields: A map of key-value pairs to be added as fields to the logger.
 //
-// Example:
+// The function ensures that the fields map is initialized if it is nil
+// and then adds the provided key-value pairs to the map.
+func WithFields(fields map[string]string) Option {
+	return func(opt *options) {
+		if opt.fields == nil {
+			opt.fields = make(map[string]string)
+		}
+		for k, v := range fields {
+			opt.fields[k] = v
+		}
+	}
+}
+
+// WithTimeLayout returns an Option that configures the time layout used by the logger.
 //
-//	 logger, err:= logger.NewJsonLogger(
-//			logger.WithTimeLayout("2006-01-02 15:04:05"),
-//		)
+// The function accepts a string parameter that is used to set the time layout
+// used by the logger. The time layout is used to format the time in log messages.
+//
+// The default time layout is "2006-01-02 15:04:05.000000 -0700 MST".
 func WithTimeLayout(timeLayout string) Option {
-	return func(opt *option) {
+	return func(opt *options) {
 		opt.timeLayout = timeLayout
 	}
 }
 
-// WithDisableConsole returns an Option that disables console logging.
+// WithDisableConsole returns an Option that disables the console writer.
 //
-// When this option is applied, log messages will not be printed to the console
-// but will still be written to the configured log files.
-//
-// Example:
-//
-//	 logger, err:= logger.NewJsonLogger(
-//			logger.WithDisableConsole(),
-//		)
+// When this option is used, the logger will not write logs to the console.
+// This is useful when you want to log to a file only.
 func WithDisableConsole() Option {
-	return func(opt *option) {
-		// Set the disableConsole flag to true to disable console logging.
+	return func(opt *options) {
 		opt.disableConsole = true
 	}
 }
 
 // WithLogDir returns an Option that sets the log directory for the logger.
 //
-// The logDir argument specifies the log directory. If the logDir is empty,
-// the logger will not write log messages to files.
+// The log directory is where the logger will write log files. The default log
+// directory is the current working directory.
 //
-// Example:
-//
-//	 logger, err:= logger.NewJsonLogger(
-//			logger.WithLogDir("/var/log"),
-//		)
+// Parameters:
+//   - logDir: The log directory to be used by the logger.
 func WithLogDir(logDir string) Option {
-	return func(opt *option) {
+	return func(opt *options) {
 		opt.logDir = logDir
 	}
 }
 
-// NewJsonLogger creates a new JSON logger with the given options.
+// NewJsonLogger creates a new JSON formatted logger with the given options.
 //
-// The option argument is a variadic list of Option functions that customize
-// the logger. The available options are:
+// This function validates the log configuration and initializes default options
+// for the logger, such as the logging level, log directory, and time layout.
+// It applies user-provided options to override these defaults. The logger writes
+// logs to files in the specified log directory and can log to the console if enabled.
 //
-//   - WithLevel: sets the log level to the specified level.
-//   - WithFields: sets the log fields to the specified values.
-//   - WithTimeLayout: sets the time layout to the specified format.
-//   - WithDisableConsole: disables console logging.
-//   - WithLogDir: sets the log directory to the specified path.
+// It creates log cores for different log levels, ensuring the log directory exists,
+// and combines them into a single core. The logger includes caller information and
+// stack traces for errors. Additional fields configured through options are added
+// to the logger.
+//
+// Parameters:
+//   - opts: A variadic list of Option functions to configure the logger.
+//
+// Returns:
+//   - *zap.Logger: A configured zap.Logger instance.
+//   - error: An error if the logger cannot be created, such as when the log
+//     configuration is not initialized or the log directory cannot be
+//     created.
 func NewJsonLogger(opts ...Option) (*zap.Logger, error) {
-	// Initialize the logger configuration with default values
-	opt := &option{
+	// Validate configuration
+	if config.LogConfig == nil {
+		return nil, fmt.Errorf("log configuration is not initialized")
+	}
+
+	// Initialize default options
+	opt := &options{
 		level:  GetDefaultLevel(),
 		fields: make(map[string]string),
 		logDir: config.LogConfig.Log.LogDir,
 	}
 
-	// Apply the provided options to the logger configuration
+	// Apply provided options
 	for _, f := range opts {
 		f(opt)
 	}
 
-	// Set the time layout for the logger
+	// Validate log directory
+	if opt.logDir == "" {
+		return nil, fmt.Errorf("log directory is not configured")
+	}
+
+	// Set time layout
 	timeLayout := common.DefaultTimeLayout
 	if opt.timeLayout != "" {
 		timeLayout = opt.timeLayout
 	}
 
-	// Configure the encoder for the logger
-	encoderConfig := zapcore.EncoderConfig{
+	// Create encoder configuration
+	encoderConfig := createEncoderConfig(timeLayout)
+	jsonEncoder := zapcore.NewJSONEncoder(encoderConfig)
+
+	// Ensure log directory exists
+	if err := os.MkdirAll(opt.logDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create log directory: %w", err)
+	}
+
+	// Create log writers and cores
+	cores, errorWriter, err := createLogCores(jsonEncoder, opt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create log cores: %w", err)
+	}
+
+	// Combine all cores
+	core := zapcore.NewTee(cores...)
+
+	// Add console logging if enabled
+	if !opt.disableConsole {
+		consoleCores := createConsoleCores(jsonEncoder, opt.level)
+		core = zapcore.NewTee(append(cores, consoleCores...)...)
+	}
+
+	// Create logger with options
+	loggerOptions := []zap.Option{
+		zap.AddCaller(),
+		zap.AddStacktrace(zapcore.ErrorLevel),
+	}
+
+	if errorWriter != nil {
+		loggerOptions = append(loggerOptions, zap.ErrorOutput(zapcore.AddSync(errorWriter)))
+	}
+
+	zapLogger := zap.New(core, loggerOptions...)
+
+	// Add configured fields
+	if len(opt.fields) > 0 {
+		fields := make([]zapcore.Field, 0, len(opt.fields))
+		for k, v := range opt.fields {
+			fields = append(fields, zap.String(k, v))
+		}
+		zapLogger = zapLogger.With(fields...)
+	}
+
+	return zapLogger, nil
+}
+
+// createEncoderConfig returns a zapcore.EncoderConfig configured with the specified
+// time layout for encoding time fields. It defines the keys for different log
+// components such as time, level, logger name, caller, message, and stack trace.
+// The function also sets the encoding formats for log levels, time, duration, and
+// caller information. The time is encoded using the provided timeLayout, allowing
+// customization of the timestamp format in the logs.
+func createEncoderConfig(timeLayout string) zapcore.EncoderConfig {
+	return zapcore.EncoderConfig{
 		TimeKey:       "time",
 		LevelKey:      "level",
 		NameKey:       "logger",
@@ -194,143 +262,168 @@ func NewJsonLogger(opts ...Option) (*zap.Logger, error) {
 		EncodeDuration: zapcore.MillisDurationEncoder,
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
+}
 
-	// Create a JSON encoder using the configured encoder settings
-	jsonEncoder := zapcore.NewJSONEncoder(encoderConfig)
+// createLogCores creates log cores for different log levels and returns a slice
+// of zapcore.Core and an error writer.
+//
+// Parameters:
+//   - encoder: The zapcore.Encoder used to encode log messages.
+//   - opt: A pointer to an options struct containing configuration options,
+//     including the log directory and file names.
+//
+// Returns:
+//   - []zapcore.Core: A slice of zapcore.Core, each responsible for logging
+//     at a specific log level.
+//   - io.Writer: An error writer for handling errors during logging.
+//   - error: An error if there is a failure in creating log writers or cores.
+//
+// This function creates log writers for debug, info, warn, and error levels
+// by calling createLogWriter with paths constructed from opt.logDir and
+// configuration file names. It then initializes zapcore.Core for each log level
+// with corresponding level enablers.
+func createLogCores(encoder zapcore.Encoder, opt *options) ([]zapcore.Core, io.Writer, error) {
+	cfg := &config.LogConfig.Log
 
-	// Ensure the log directory exists, creating it if necessary
-	if err := os.MkdirAll(opt.logDir, 0766); err != nil {
-		return nil, err
+	// Create writers for each log level
+	debugWriter, err := createLogWriter(filepath.Join(opt.logDir, cfg.LogFileDebug))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create debug writer: %w", err)
 	}
 
-	// Create log writers for different log levels
-	debugWriter := newLogWriter(filepath.Join(opt.logDir, config.LogConfig.Log.LogFileDebug))
-	infoWriter := newLogWriter(filepath.Join(opt.logDir, config.LogConfig.Log.LogFileInfo))
-	warnWriter := newLogWriter(filepath.Join(opt.logDir, config.LogConfig.Log.LogFileWarn))
-	errorWriter := newLogWriter(filepath.Join(opt.logDir, config.LogConfig.Log.LogFileError))
+	infoWriter, err := createLogWriter(filepath.Join(opt.logDir, cfg.LogFileInfo))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create info writer: %w", err)
+	}
 
-	// Create cores for each log level, specifying the encoder and writer
-	debugCore := zapcore.NewCore(
-		jsonEncoder,
-		zapcore.AddSync(debugWriter),
-		zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-			return lvl == zapcore.DebugLevel
-		}),
-	)
+	warnWriter, err := createLogWriter(filepath.Join(opt.logDir, cfg.LogFileWarn))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create warn writer: %w", err)
+	}
 
-	infoCore := zapcore.NewCore(
-		jsonEncoder,
-		zapcore.AddSync(infoWriter),
-		zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-			return lvl == zapcore.InfoLevel
-		}),
-	)
+	errorWriter, err := createLogWriter(filepath.Join(opt.logDir, cfg.LogFileError))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create error writer: %w", err)
+	}
 
-	warnCore := zapcore.NewCore(
-		jsonEncoder,
-		zapcore.AddSync(warnWriter),
-		zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-			return lvl == zapcore.WarnLevel
-		}),
-	)
+	// Create cores for each level
+	cores := []zapcore.Core{
+		zapcore.NewCore(encoder, zapcore.AddSync(debugWriter), createLevelEnabler(zapcore.DebugLevel, zapcore.DebugLevel)),
+		zapcore.NewCore(encoder, zapcore.AddSync(infoWriter), createLevelEnabler(zapcore.InfoLevel, zapcore.InfoLevel)),
+		zapcore.NewCore(encoder, zapcore.AddSync(warnWriter), createLevelEnabler(zapcore.WarnLevel, zapcore.WarnLevel)),
+		zapcore.NewCore(encoder, zapcore.AddSync(errorWriter), createLevelEnabler(zapcore.ErrorLevel, zapcore.FatalLevel)),
+	}
 
-	errorCore := zapcore.NewCore(
-		jsonEncoder,
-		zapcore.AddSync(errorWriter),
-		zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-			return lvl >= zapcore.ErrorLevel
-		}),
-	)
+	return cores, errorWriter, nil
+}
 
-	// Combine the cores into a single tee core
-	core := zapcore.NewTee(debugCore, infoCore, warnCore, errorCore)
-
+// createConsoleCores returns zapcore.Cores that write logs to the console.
+//
+// This function creates two zapcore.Cores: one for standard output (stdout)
+// and another for standard error (stderr). It uses the provided encoder to
+// format log entries. The stdout core logs messages with levels from minLevel
+// up to, but not including, the warn level. The stderr core logs messages
+// with levels from error to fatal.
+//
+// Parameters:
+//   - encoder: zapcore.Encoder used to format the log entries.
+//   - minLevel: zapcore.Level specifying the minimum log level for stdout.
+//
+// Returns:
+//   - []zapcore.Core: A slice containing the stdout and stderr cores.
+func createConsoleCores(encoder zapcore.Encoder, minLevel zapcore.Level) []zapcore.Core {
 	stdout := zapcore.Lock(os.Stdout)
 	stderr := zapcore.Lock(os.Stderr)
 
-	// Optionally add console logging to the core
-	if !opt.disableConsole {
-		core = zapcore.NewTee(core,
-			zapcore.NewCore(jsonEncoder, zapcore.NewMultiWriteSyncer(stdout), zapcore.InfoLevel),
-			zapcore.NewCore(jsonEncoder, zapcore.NewMultiWriteSyncer(stderr), zapcore.ErrorLevel),
-		)
+	return []zapcore.Core{
+		zapcore.NewCore(encoder, stdout, createLevelEnabler(minLevel, zapcore.WarnLevel-1)),
+		zapcore.NewCore(encoder, stderr, createLevelEnabler(zapcore.ErrorLevel, zapcore.FatalLevel)),
 	}
-
-	// Create the final logger with the combined core and caller information
-	logger := zap.New(core, zap.AddCaller(), zap.ErrorOutput(zapcore.AddSync(errorWriter)))
-
-	// Add any configured fields to the logger
-	for k, v := range opt.fields {
-		logger = logger.WithOptions(zap.Fields(zapcore.Field{Key: k, Type: zapcore.StringType, String: v}))
-	}
-
-	return logger, nil
 }
 
-// newLogWriter creates a new log writer that writes to a file.
-// It returns a lumberjack.Logger that implements the io.Writer interface.
-// The logger will write to the file specified by the file parameter and
-// will rotate the file when it reaches the maximum size specified by the
-// MaxSize parameter. The logger will also keep a maximum of 300 backups
-// and will delete any backups older than 30 days.
-//
-// The logger will also use the local time zone when writing log entries.
-// If the Compress option is true, the logger will compress the log
-// entries using gzip.
+// createLevelEnabler returns a zap.LevelEnablerFunc that enables logging for
+// levels in the range [min, max] (inclusive).
 //
 // Parameters:
-//   - file: The name of the file to write to.
+//   - min: The minimum zapcore.Level for which logging is enabled.
+//   - max: The maximum zapcore.Level for which logging is enabled.
 //
 // Returns:
-//   - A lumberjack.Logger that implements the io.Writer interface.
-func newLogWriter(file string) io.Writer {
-	// Create a new lumberjack.Logger that implements the io.Writer interface
-	// The logger will write to the file specified by the file parameter and
-	// will rotate the file when it reaches the maximum size specified by the
-	// MaxSize parameter. The logger will also keep a maximum of 300 backups
-	// and will delete any backups older than 30 days.
-	// The logger will also use the local time zone when writing log entries.
-	// If the Compress option is true, the logger will compress the log
-	// entries using gzip.
-	return &lumberjack.Logger{
-		Filename:   file,
-		MaxSize:    config.LogConfig.Log.MaxSize,
-		MaxBackups: config.LogConfig.Log.MaxBackups,
-		MaxAge:     config.LogConfig.Log.MaxAge,
-		LocalTime:  config.LogConfig.Log.LocalTime,
-		Compress:   config.LogConfig.Log.Compress,
+//   - zap.LevelEnablerFunc: A function that takes a zapcore.Level and returns a
+//     boolean indicating whether logging is enabled for that level.
+func createLevelEnabler(min, max zapcore.Level) zap.LevelEnablerFunc {
+	return func(lvl zapcore.Level) bool {
+		return lvl >= min && lvl <= max
 	}
 }
 
-// Close gracefully closes the provided zap.Logger.
-// It ensures that all buffered log entries are written out before returning.
-// If the logger is nil, it returns immediately without an error.
-// The function is safe to call from multiple goroutines.
-func Close(logger *zap.Logger) error {
-	if logger == nil {
-		// No logger to close, return immediately.
+// createLogWriter creates and returns a log writer for the specified filename.
+//
+// This function checks if the provided filename is not empty and ensures that
+// the directory for the file exists, creating it if necessary. It then creates
+// a new lumberjack.Logger configured with the log settings, which include the
+// maximum size, number of backups, age, and compression options.
+//
+// Parameters:
+//   - filename: A string representing the path to the log file.
+//
+// Returns:
+//   - io.Writer: A writer interface for the created log file.
+//   - error: An error if the filename is empty or the directory cannot be created.
+func createLogWriter(filename string) (io.Writer, error) {
+	if filename == "" {
+		return nil, fmt.Errorf("filename cannot be empty")
+	}
+
+	// Ensure the directory exists
+	dir := filepath.Dir(filename)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	cfg := &config.LogConfig.Log
+	return &lumberjack.Logger{
+		Filename:   filename,
+		MaxSize:    cfg.MaxSize,
+		MaxBackups: cfg.MaxBackups,
+		MaxAge:     cfg.MaxAge,
+		LocalTime:  cfg.LocalTime,
+		Compress:   cfg.Compress,
+	}, nil
+}
+
+// Close synchronizes the logger, flushing any buffered log entries to their
+// respective writers. This should be called when the program is exiting.
+//
+// Parameters:
+//   - zapLogger: A pointer to the zap.Logger to be closed. If nil, this function
+//     returns immediately without error.
+//
+// Returns:
+//   - error: An error if the logger cannot be synchronized.
+func Close(zapLogger *zap.Logger) error {
+	if zapLogger == nil {
 		return nil
 	}
-	// Sync the logger to flush all buffered log entries.
-	// This ensures that all log entries are written out before returning.
-	// The Sync function is safe to call from multiple goroutines.
-	return logger.Sync()
+	return zapLogger.Sync()
 }
 
-// GetDefaultLevel returns the default log level for the logger.
+// GetDefaultLevel returns the default logging level defined in the configuration.
 //
-// It checks the DefaultLevel field in the LogConfig struct and returns
-// the corresponding zapcore.Level value.
-// If the value in the configuration is invalid, it returns zapcore.InfoLevel.
+// If the log configuration is not initialized, it defaults to the Info level.
+// The function checks the DefaultLevel field of the log configuration and
+// maps it to the corresponding zapcore.Level. Supported log levels are
+// Debug, Info, Warn, and Error. If the DefaultLevel is not recognized,
+// it defaults to the Info level.
+//
+// Returns:
+//   - zapcore.Level: The logging level based on the configuration or
+//     the default Info level if the configuration is not available.
 func GetDefaultLevel() zapcore.Level {
-	// Check the value in the configuration and return the corresponding zapcore.Level
-	// The default log level is determined by the value in the DefaultLevel field
-	// of the LogConfig struct. The field can be one of the following values:
-	//  - "debug"
-	//  - "info"
-	//  - "warn"
-	//  - "error"
-	// If the value in the configuration is invalid, it returns zapcore.InfoLevel
+	if config.LogConfig == nil {
+		return zapcore.InfoLevel
+	}
+
 	switch config.LogConfig.Log.DefaultLevel {
 	case common.LogLevelDebug:
 		return zapcore.DebugLevel
@@ -341,7 +434,23 @@ func GetDefaultLevel() zapcore.Level {
 	case common.LogLevelError:
 		return zapcore.ErrorLevel
 	default:
-		// If the value in the configuration is invalid, return zapcore.InfoLevel
 		return zapcore.InfoLevel
+	}
+}
+
+// ValidateLogLevel checks if the provided log level is valid and returns an
+// error if not. Valid log levels are debug, info, warn, and error.
+//
+// Parameters:
+//   - level: A string representing the log level to be validated.
+//
+// Returns:
+//   - error: An error if the log level is invalid, otherwise nil.
+func ValidateLogLevel(level string) error {
+	switch level {
+	case common.LogLevelDebug, common.LogLevelInfo, common.LogLevelWarn, common.LogLevelError:
+		return nil
+	default:
+		return fmt.Errorf("invalid log level: %s, must be one of: debug, info, warn, error", level)
 	}
 }

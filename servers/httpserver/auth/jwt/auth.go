@@ -19,7 +19,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// 常量定义
 const (
 	MinUsernameLength = 3
 	MaxUsernameLength = 20
@@ -43,11 +42,11 @@ const (
 )
 
 var (
-	// 预编译正则表达式，提高性能
+	// usernameRegex defines the allowed format for the username
 	usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 )
 
-// ValidationError 验证错误结构
+// ValidationError represents a validation error with a field and a message.
 type ValidationError struct {
 	Field   string `json:"field"`
 	Message string `json:"message"`
