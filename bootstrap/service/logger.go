@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -293,7 +294,7 @@ func createLoggerInstance(ctx context.Context) (*zap.Logger, error) {
 func CloseLogger(ctx context.Context) error {
 	if resource.LoggerService == nil {
 		// Use standard log for this message since logger is not available
-		fmt.Println("logger service is not initialized, nothing to close")
+		log.Println("logger service is not initialized, nothing to close")
 		return nil
 	}
 
@@ -313,7 +314,7 @@ func CloseLogger(ctx context.Context) error {
 		if err := resource.LoggerService.Sync(); err != nil {
 			// Sync errors are common and usually not critical
 			// Log the error but don't fail the close operation
-			fmt.Printf("Warning: logger sync failed during close: %v\n", err)
+			log.Printf("Warning: logger sync failed during close: %v\n", err)
 		}
 
 		done <- nil
@@ -332,7 +333,7 @@ func CloseLogger(ctx context.Context) error {
 	// Clear the global reference
 	resource.LoggerService = nil
 
-	fmt.Println("logger service closed successfully")
+	log.Println(fmt.Sprintf("logger service closed successfully"))
 	return nil
 }
 

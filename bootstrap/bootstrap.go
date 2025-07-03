@@ -164,12 +164,6 @@ func Close(ctx context.Context) error {
 		errs = append(errs, err)
 	}
 
-	// Close the TDengine client.
-	err = service.CloseTDengine(ctx)
-	if err != nil {
-		errs = append(errs, err)
-	}
-
 	// Close the MongoDB client.
 	err = service.CloseMongoDB(ctx)
 	if err != nil {
@@ -196,12 +190,6 @@ func Close(ctx context.Context) error {
 
 	// Close the Cron scheduler.
 	err = service.CloseCron(ctx)
-	if err != nil {
-		errs = append(errs, err)
-	}
-
-	// Close the Manticore client.
-	err = service.CloseManticore(ctx)
 	if err != nil {
 		errs = append(errs, err)
 	}

@@ -10,6 +10,31 @@ import (
 
 // prometheus.CounterVec
 var (
+	Timer = prometheus.NewTimer(ServerStartupDuration)
+
+	AppStartTime = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "app_start_timestamp_seconds",
+			Help: "Application start timestamp",
+		},
+		[]string{"version"},
+	)
+
+	AppUptime = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "app_uptime_seconds",
+			Help: "Application uptime in seconds",
+		},
+		[]string{"version"},
+	)
+
+	ServerStartupDuration = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name: "server_startup_duration_seconds",
+			Help: "Time taken to start servers",
+		},
+	)
+
 	httpRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "http_requests_total",
@@ -27,6 +52,13 @@ var (
 		[]string{"method", "path"},
 	)
 )
+
+// init registers the prometheus metrics with the default prometheus registry.
+//
+// This init function is called automatically when the package is initialized.
+func init() {
+	prometheus.MustRegister(AppStartTime, AppUptime, ServerStartupDuration)
+}
 
 // PrometheusMiddleware returns a gin.HandlerFunc that records
 // request metrics using Prometheus. It records the total count
