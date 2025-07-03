@@ -12,6 +12,7 @@ import (
 	"github.com/xiebingnote/go-gin-project/bootstrap"
 	"github.com/xiebingnote/go-gin-project/library/middleware"
 	"github.com/xiebingnote/go-gin-project/library/resource"
+	"github.com/xiebingnote/go-gin-project/pkg/circuitbreaker"
 	"github.com/xiebingnote/go-gin-project/pkg/shutdown"
 	"github.com/xiebingnote/go-gin-project/servers"
 
@@ -31,6 +32,9 @@ var defaultTimeouts = AppTimeouts{
 	ServerShutdown:  10 * time.Second,
 	ResourceCleanup: 15 * time.Second,
 }
+
+// 全局熔断器管理器
+var circuitBreakerManager *middleware.CircuitBreakerManager
 
 // StartupError represents an error that occurred during startup.
 type StartupError struct {
@@ -89,16 +93,19 @@ func main() {
 	ctx := context.Background()
 	bootstrap.MustInit(ctx)
 
-	// 2. Start the servers and monitor startup metrics
+	// 2. Initialize circuit breaker manager
+	initializeCircuitBreaker()
+
+	// 3. Start the servers and monitor startup metrics
 	serverPair, err := startServersWithMetrics()
 	if err != nil {
 		resource.LoggerService.Fatal("Failed to start serverPair", zap.Error(err))
 	}
 
-	// 3. Start background tasks such as memory monitoring and uptime updates
+	// 4. Start background tasks such as memory monitoring and uptime updates
 	startBackgroundTasks()
 
-	// 4. Log the time taken to complete startup
+	// 5. Log the time taken to complete startup
 	startupDuration := time.Since(startTime)
 	middleware.ServerStartupDuration.Observe(startupDuration.Seconds())
 	resource.LoggerService.Info("✅ Application started successfully",
@@ -107,7 +114,7 @@ func main() {
 		zap.String("admin_server", serverPair.Admin.Addr),
 	)
 
-	// 5. Set up graceful shutdown to handle termination signals
+	// 6. Set up graceful shutdown to handle termination signals
 	setupGracefulShutdown(serverPair, defaultTimeouts)
 }
 
@@ -320,4 +327,70 @@ func handlePanic(r interface{}) {
 		log.Printf("Application panic recovered: %v\n", r)
 		log.Printf("Stack trace: %s\n", string(debug.Stack()))
 	}
+}
+
+// initializeCircuitBreaker initializes the circuit breaker manager and creates
+// some predefined circuit breakers for critical services
+func initializeCircuitBreaker() {
+	// Create circuit breaker manager
+	circuitBreakerManager = middleware.NewCircuitBreakerManager(resource.LoggerService)
+
+	// Create circuit breakers for critical services
+	createServiceCircuitBreakers()
+
+	resource.LoggerService.Info("Circuit breaker manager initialized successfully")
+}
+
+// createServiceCircuitBreakers creates circuit breakers for critical services
+func createServiceCircuitBreakers() {
+	// Database circuit breaker
+	if resource.MySQLClient != nil {
+		circuitBreakerManager.GetOrCreateBreaker("mysql", circuitbreaker.Config{
+			MaxRequests: 5,
+			Interval:    30 * time.Second,
+			Timeout:     60 * time.Second,
+			ReadyToTrip: func(counts circuitbreaker.Counts) bool {
+				return counts.Requests >= 10 &&
+					   float64(counts.TotalFailures)/float64(counts.Requests) >= 0.5
+			},
+			IsSuccessful: func(err error) bool {
+				return err == nil
+			},
+		})
+	}
+
+	// Redis circuit breaker
+	if resource.RedisClient != nil {
+		circuitBreakerManager.GetOrCreateBreaker("redis", circuitbreaker.Config{
+			MaxRequests: 10,
+			Interval:    30 * time.Second,
+			Timeout:     30 * time.Second,
+			ReadyToTrip: func(counts circuitbreaker.Counts) bool {
+				return counts.Requests >= 15 &&
+					   float64(counts.TotalFailures)/float64(counts.Requests) >= 0.6
+			},
+			IsSuccessful: func(err error) bool {
+				return err == nil
+			},
+		})
+	}
+
+	// External API circuit breaker
+	circuitBreakerManager.GetOrCreateBreaker("external-api", circuitbreaker.Config{
+		MaxRequests: 3,
+		Interval:    60 * time.Second,
+		Timeout:     120 * time.Second,
+		ReadyToTrip: func(counts circuitbreaker.Counts) bool {
+			return counts.Requests >= 20 &&
+				   float64(counts.TotalFailures)/float64(counts.Requests) >= 0.7
+		},
+		IsSuccessful: func(err error) bool {
+			return err == nil
+		},
+	})
+}
+
+// GetCircuitBreakerManager returns the global circuit breaker manager
+func GetCircuitBreakerManager() *middleware.CircuitBreakerManager {
+	return circuitBreakerManager
 }

@@ -10,8 +10,10 @@ import (
 
 // prometheus.CounterVec
 var (
+	// Timer 启动时间
 	Timer = prometheus.NewTimer(ServerStartupDuration)
 
+	// AppStartTime 启动时间
 	AppStartTime = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "app_start_timestamp_seconds",
@@ -20,6 +22,7 @@ var (
 		[]string{"version"},
 	)
 
+	// AppUptime 运行时间
 	AppUptime = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "app_uptime_seconds",
@@ -28,6 +31,7 @@ var (
 		[]string{"version"},
 	)
 
+	// ServerStartupDuration 启动时间
 	ServerStartupDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Name: "server_startup_duration_seconds",
@@ -35,6 +39,7 @@ var (
 		},
 	)
 
+	// HTTP 请求计数
 	httpRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "http_requests_total",
@@ -43,6 +48,7 @@ var (
 		[]string{"method", "path"},
 	)
 
+	// HTTP 请求持续时间
 	httpRequestDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "http_request_duration_seconds",
