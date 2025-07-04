@@ -84,7 +84,7 @@ func InitPostgresqlClient() error {
 
 	// Store the initialized GORM DB in the global resource
 	resource.PostgresqlClient = db
-	resource.LoggerService.Info("successfully connected to postgresql")
+	resource.LoggerService.Info("✅ successfully connected to postgresql")
 	return nil
 }
 
@@ -242,6 +242,10 @@ func ClosePostgresql() error {
 
 	// Reset the global PostgreSQL client to nil.
 	resource.PostgresqlClient = nil
+
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("✅ successfully closed postgresql connection")
+	}
 
 	// Return nil to indicate success.
 	return nil

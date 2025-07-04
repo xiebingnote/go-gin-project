@@ -203,7 +203,9 @@ func CloseEtcd() error {
 
 	// Reset the global Etcd client to nil
 	resource.EtcdClient = nil
-	resource.LoggerService.Info("successfully closed etcd connection")
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("✅ successfully closed etcd connection")
+	}
 
 	return nil
 }

@@ -70,7 +70,7 @@ func InitTDengineClient(ctx context.Context) error {
 	// Store the client in the resource package
 	resource.TDengineClient = db
 
-	resource.LoggerService.Info("successfully initialized tdengine client")
+	resource.LoggerService.Info("✅ successfully initialized tdengine client")
 	return nil
 }
 
@@ -404,7 +404,6 @@ func testTDengineQuery(ctx context.Context, db *sql.DB) error {
 // 3. Clears the global resource reference
 func CloseTDengine(ctx context.Context) error {
 	if resource.TDengineClient == nil {
-		resource.LoggerService.Info("tdengine client is not initialized, nothing to close")
 		return nil
 	}
 
@@ -443,6 +442,9 @@ func CloseTDengine(ctx context.Context) error {
 	// Clear the global reference
 	resource.TDengineClient = nil
 
-	resource.LoggerService.Info("successfully closed tdengine client")
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("✅ successfully closed tdengine client")
+	}
+
 	return nil
 }

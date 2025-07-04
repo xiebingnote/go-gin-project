@@ -300,7 +300,6 @@ func startCronHealthCheck(ctx context.Context, interval time.Duration) {
 // 4. Clears the global resource reference
 func CloseCron(ctx context.Context) error {
 	if resource.Corn == nil {
-		resource.LoggerService.Info("cron scheduler is not initialized, nothing to close")
 		return nil
 	}
 
@@ -340,6 +339,9 @@ func CloseCron(ctx context.Context) error {
 	// Clear the global scheduler reference
 	resource.Corn = nil
 
-	resource.LoggerService.Info("successfully closed cron scheduler")
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("✅ successfully closed cron scheduler")
+	}
+
 	return nil
 }

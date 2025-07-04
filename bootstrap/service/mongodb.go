@@ -136,7 +136,7 @@ func InitMongoDBClient(ctx context.Context) error {
 	resource.MongoDBClient = database
 
 	// Log successful connection with connection details
-	resource.LoggerService.Info(fmt.Sprintf("Successfully connected to MongoDB database '%s' at %s:%v",
+	resource.LoggerService.Info(fmt.Sprintf("✅ successfully connected to MongoDB database '%s' at %s:%v",
 		cfg.DBName, cfg.Host, cfg.Port))
 
 	// Return nil to indicate successful initialization
@@ -157,7 +157,6 @@ func InitMongoDBClient(ctx context.Context) error {
 func CloseMongoDB(ctx context.Context) error {
 	// Check if the global MongoDBClient resource is initialized
 	if resource.MongoDBClient == nil {
-		resource.LoggerService.Info("MongoDB client is not initialized, nothing to close")
 		return nil
 	}
 
@@ -177,7 +176,7 @@ func CloseMongoDB(ctx context.Context) error {
 
 	// Log successful disconnection (check if logger is still available)
 	if resource.LoggerService != nil {
-		resource.LoggerService.Info("Successfully disconnected from MongoDB")
+		resource.LoggerService.Info("✅ successfully disconnected from MongoDB")
 	}
 	return nil
 }

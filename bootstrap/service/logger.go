@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/xiebingnote/go-gin-project/library/config"
@@ -72,7 +73,7 @@ func InitLoggerService(ctx context.Context) error {
 	resource.LoggerService = loggerInstance
 
 	// Log successful initialization
-	resource.LoggerService.Info("logger service initialized successfully",
+	resource.LoggerService.Info("✅ logger service initialized successfully",
 		zap.String("log_dir", config.LogConfig.Log.LogDir),
 		zap.String("log_level", config.LogConfig.Log.DefaultLevel),
 		zap.String("version", config.ServerConfig.Version.Version),
@@ -302,9 +303,6 @@ func CloseLogger(ctx context.Context) error {
 	closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	// Log the shutdown message before closing
-	resource.LoggerService.Info("shutting down logger service")
-
 	// Flush pending log entries
 	done := make(chan error, 1)
 	go func() {
@@ -312,9 +310,12 @@ func CloseLogger(ctx context.Context) error {
 
 		// Sync the logger to flush any pending entries
 		if err := resource.LoggerService.Sync(); err != nil {
-			// Sync errors are common and usually not critical
-			// Log the error but don't fail the close operation
-			log.Printf("Warning: logger sync failed during close: %v\n", err)
+			// Check if this is a common sync error that can be safely ignored
+			if isSyncErrorIgnorable(err) {
+				log.Printf("Info: logger sync completed with expected warnings: %v", err)
+			} else {
+				log.Printf("Warning: logger sync failed during close: %v", err)
+			}
 		}
 
 		done <- nil
@@ -333,7 +334,6 @@ func CloseLogger(ctx context.Context) error {
 	// Clear the global reference
 	resource.LoggerService = nil
 
-	log.Println(fmt.Sprintf("logger service closed successfully"))
 	return nil
 }
 
@@ -347,6 +347,11 @@ func FlushLogger() error {
 	}
 
 	if err := resource.LoggerService.Sync(); err != nil {
+		// Check if this is a common sync error that can be safely ignored
+		if isSyncErrorIgnorable(err) {
+			log.Printf("Info: logger flush completed with expected warnings: %v", err)
+			return nil
+		}
 		return fmt.Errorf("failed to flush logger: %w", err)
 	}
 
@@ -370,4 +375,43 @@ func GetLoggerLevel() string {
 //   - bool: True if logger is initialized, false otherwise
 func IsLoggerInitialized() bool {
 	return resource.LoggerService != nil
+}
+
+// isSyncErrorIgnorable checks if a sync error can be safely ignored.
+//
+// Parameters:
+//   - err: The error to check
+//
+// Returns:
+//   - bool: True if the error can be ignored, false otherwise
+//
+// Common ignorable sync errors include:
+// - "sync /dev/stdout: bad file descriptor" - stdout already closed
+// - "sync /dev/stderr: bad file descriptor" - stderr already closed
+// - "sync /dev/stdout: inappropriate ioctl for device" - stdout is not a regular file
+// - "sync /dev/stderr: inappropriate ioctl for device" - stderr is not a regular file
+func isSyncErrorIgnorable(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := err.Error()
+
+	// Check for common ignorable sync errors
+	ignorablePatterns := []string{
+		"sync /dev/stdout: bad file descriptor",
+		"sync /dev/stderr: bad file descriptor",
+		"sync /dev/stdout: inappropriate ioctl for device",
+		"sync /dev/stderr: inappropriate ioctl for device",
+		"sync /dev/stdout: operation not supported",
+		"sync /dev/stderr: operation not supported",
+	}
+
+	for _, pattern := range ignorablePatterns {
+		if strings.Contains(errStr, pattern) {
+			return true
+		}
+	}
+
+	return false
 }

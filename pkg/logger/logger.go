@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/xiebingnote/go-gin-project/library/common"
@@ -319,26 +320,34 @@ func createLogCores(encoder zapcore.Encoder, opt *options) ([]zapcore.Core, io.W
 
 // createConsoleCores returns zapcore.Cores that write logs to the console.
 //
-// This function creates two zapcore.Cores: one for standard output (stdout)
-// and another for standard error (stderr). It uses the provided encoder to
-// format log entries. The stdout core logs messages with levels from minLevel
-// up to, but not including, the warn level. The stderr core logs messages
-// with levels from error to fatal.
+// This function creates console cores with safe file descriptor handling.
+// It checks if stdout and stderr are valid before creating cores for them.
+// The stdout core logs messages with levels from minLevel up to, but not
+// including, the warn level. The stderr core logs messages with levels
+// from error to fatal.
 //
 // Parameters:
 //   - encoder: zapcore.Encoder used to format the log entries.
 //   - minLevel: zapcore.Level specifying the minimum log level for stdout.
 //
 // Returns:
-//   - []zapcore.Core: A slice containing the stdout and stderr cores.
+//   - []zapcore.Core: A slice containing valid console cores.
 func createConsoleCores(encoder zapcore.Encoder, minLevel zapcore.Level) []zapcore.Core {
-	stdout := zapcore.Lock(os.Stdout)
-	stderr := zapcore.Lock(os.Stderr)
+	var cores []zapcore.Core
 
-	return []zapcore.Core{
-		zapcore.NewCore(encoder, stdout, createLevelEnabler(minLevel, zapcore.WarnLevel-1)),
-		zapcore.NewCore(encoder, stderr, createLevelEnabler(zapcore.ErrorLevel, zapcore.FatalLevel)),
+	// Create stdout core if stdout is valid
+	if isValidFileDescriptor(os.Stdout) {
+		stdout := zapcore.Lock(os.Stdout)
+		cores = append(cores, zapcore.NewCore(encoder, stdout, createLevelEnabler(minLevel, zapcore.WarnLevel-1)))
 	}
+
+	// Create stderr core if stderr is valid
+	if isValidFileDescriptor(os.Stderr) {
+		stderr := zapcore.Lock(os.Stderr)
+		cores = append(cores, zapcore.NewCore(encoder, stderr, createLevelEnabler(zapcore.ErrorLevel, zapcore.FatalLevel)))
+	}
+
+	return cores
 }
 
 // createLevelEnabler returns a zap.LevelEnablerFunc that enables logging for
@@ -453,4 +462,30 @@ func ValidateLogLevel(level string) error {
 	default:
 		return fmt.Errorf("invalid log level: %s, must be one of: debug, info, warn, error", level)
 	}
+}
+
+// isValidFileDescriptor checks if a file descriptor is valid and can be used for writing.
+//
+// Parameters:
+//   - file: The file to check
+//
+// Returns:
+//   - bool: True if the file descriptor is valid, false otherwise
+//
+// This function helps prevent sync errors when stdout/stderr are closed or invalid.
+func isValidFileDescriptor(file *os.File) bool {
+	if file == nil {
+		return false
+	}
+
+	// Get the file descriptor
+	fd := file.Fd()
+
+	// Check if the file descriptor is valid using syscall
+	// We use a simple stat call to check if the fd is valid
+	var stat syscall.Stat_t
+	err := syscall.Fstat(int(fd), &stat)
+
+	// If fstat succeeds, the file descriptor is valid
+	return err == nil
 }

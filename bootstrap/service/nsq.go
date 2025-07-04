@@ -65,7 +65,7 @@ func InitNSQClient(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize NSQ consumer: %w", err)
 	}
 
-	resource.LoggerService.Info(fmt.Sprintf("Successfully initialized NSQ client with %d producers and 1 consumer",
+	resource.LoggerService.Info(fmt.Sprintf("✅ successfully initialized NSQ client with %d producers and 1 consumer",
 		len(resource.NsqProducer)))
 
 	return nil
@@ -160,8 +160,8 @@ func InitProducers(ctx context.Context) error {
 
 	// Set additional configuration for better reliability
 	nsqConfig.WriteTimeout = 10 * time.Second
-	nsqConfig.ReadTimeout = 60 * time.Second  // Increase ReadTimeout to be larger than HeartbeatInterval
-	nsqConfig.HeartbeatInterval = 5 * time.Second  // Set HeartbeatInterval to be less than ReadTimeout
+	nsqConfig.ReadTimeout = 60 * time.Second      // Increase ReadTimeout to be larger than HeartbeatInterval
+	nsqConfig.HeartbeatInterval = 5 * time.Second // Set HeartbeatInterval to be less than ReadTimeout
 
 	resource.LoggerService.Info(fmt.Sprintf("Initializing %d NSQ producers", len(config.NsqConfig.NSQ.Address)))
 
@@ -326,10 +326,6 @@ func InitConsumer(ctx context.Context) error {
 // 2. Stops the NSQ consumer gracefully with timeout
 // 3. Clears all global resource references
 func CloseNsq(ctx context.Context) error {
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("Starting NSQ client shutdown")
-	}
-
 	var errs []error
 
 	// Create timeout context for shutdown operations
@@ -418,6 +414,9 @@ func CloseNsq(ctx context.Context) error {
 		return combinedErr
 	}
 
-	resource.LoggerService.Info("NSQ client shutdown completed successfully")
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("✅ NSQ client shutdown completed successfully")
+	}
+
 	return nil
 }

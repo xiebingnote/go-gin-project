@@ -70,7 +70,7 @@ func InitManticoreClient(ctx context.Context) error {
 	// Store the client in the resource package
 	resource.ManticoreClient = client
 
-	resource.LoggerService.Info("successfully initialized manticore client")
+	resource.LoggerService.Info("✅ successfully initialized manticore client")
 	return nil
 }
 
@@ -273,7 +273,6 @@ func containsHelper(s, substr string) bool {
 // 3. Clears the global resource reference
 func CloseManticore(ctx context.Context) error {
 	if resource.ManticoreClient == nil {
-		resource.LoggerService.Info("manticore client is not initialized, nothing to close")
 		return nil
 	}
 
@@ -314,6 +313,9 @@ func CloseManticore(ctx context.Context) error {
 		return fmt.Errorf("manticore client close timeout")
 	}
 
-	resource.LoggerService.Info("successfully closed manticore client")
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("✅ successfully closed manticore client")
+	}
+
 	return nil
 }

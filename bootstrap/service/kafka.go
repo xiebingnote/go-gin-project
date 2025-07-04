@@ -106,7 +106,7 @@ func InitKafkaClient(ctx context.Context) error {
 	// Start the background health check
 	startKafkaHealthCheck(ctx)
 
-	resource.LoggerService.Info(fmt.Sprintf("successfully connected to kafka | brokers: %v | version: %s",
+	resource.LoggerService.Info(fmt.Sprintf("✅ successfully connected to kafka | brokers: %v | version: %s",
 		cfg.Kafka.Brokers, cfg.Kafka.Version))
 	return nil
 }
@@ -399,7 +399,10 @@ func CloseKafka() error {
 	}
 
 	// Log a success message to indicate that all connections have been closed
-	resource.LoggerService.Info("successfully closed all kafka connections")
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("✅ successfully closed all kafka connections")
+	}
+	
 	return nil
 }
 

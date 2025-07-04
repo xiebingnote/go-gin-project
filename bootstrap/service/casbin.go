@@ -81,7 +81,7 @@ func InitCasbinEnforcer(ctx context.Context) error {
 	// Store the enforcer in the resource package
 	resource.Enforcer = enforcer
 
-	resource.LoggerService.Info("successfully initialized casbin enforcer")
+	resource.LoggerService.Info("✅ successfully initialized casbin enforcer")
 	return nil
 }
 
@@ -289,14 +289,7 @@ func validateCasbinEnforcer(_ context.Context, enforcer *casbin.Enforcer) error 
 // 3. Clears the global resource reference
 func CloseCasbin(ctx context.Context) error {
 	if resource.Enforcer == nil {
-		if resource.LoggerService != nil {
-			resource.LoggerService.Info("casbin enforcer is not initialized, nothing to close")
-		}
 		return nil
-	}
-
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("closing casbin enforcer")
 	}
 
 	// Create timeout context for close operation
@@ -333,6 +326,9 @@ func CloseCasbin(ctx context.Context) error {
 	// Clear the global enforcer reference
 	resource.Enforcer = nil
 
-	resource.LoggerService.Info("successfully closed casbin enforcer")
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("✅ successfully closed casbin enforcer")
+	}
+	
 	return nil
 }

@@ -90,7 +90,7 @@ func InitRedisClient(ctx context.Context) error {
 		go startRedisHealthCheck(ctx, cfg.HealthCheckFreq)
 	}
 
-	resource.LoggerService.Info(fmt.Sprintf("successfully initialized redis client for address: %s, DB: %d",
+	resource.LoggerService.Info(fmt.Sprintf("✅ successfully initialized redis client for address: %s, DB: %d",
 		cfg.Addr, cfg.DB))
 
 	return nil
@@ -287,9 +287,6 @@ func validateRedisConfig(cfg *config.RedisConfigEntry) error {
 // 3. Clears the global resource reference
 func CloseRedis(ctx context.Context) error {
 	if resource.RedisClient == nil {
-		if resource.LoggerService != nil {
-			resource.LoggerService.Info("redis client is not initialized, nothing to close")
-		}
 		return nil
 	}
 
@@ -327,6 +324,9 @@ func CloseRedis(ctx context.Context) error {
 	// Clear the global Redis client reference
 	resource.RedisClient = nil
 
-	resource.LoggerService.Info("successfully closed redis client connection")
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("✅ successfully closed redis client connection")
+	}
+
 	return nil
 }

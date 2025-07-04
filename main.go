@@ -12,7 +12,6 @@ import (
 	"github.com/xiebingnote/go-gin-project/bootstrap"
 	"github.com/xiebingnote/go-gin-project/library/middleware"
 	"github.com/xiebingnote/go-gin-project/library/resource"
-	"github.com/xiebingnote/go-gin-project/pkg/circuitbreaker"
 	"github.com/xiebingnote/go-gin-project/pkg/shutdown"
 	"github.com/xiebingnote/go-gin-project/servers"
 
@@ -32,9 +31,6 @@ var defaultTimeouts = AppTimeouts{
 	ServerShutdown:  10 * time.Second,
 	ResourceCleanup: 15 * time.Second,
 }
-
-// 全局熔断器管理器
-var circuitBreakerManager *middleware.CircuitBreakerManager
 
 // StartupError represents an error that occurred during startup.
 type StartupError struct {
@@ -93,19 +89,16 @@ func main() {
 	ctx := context.Background()
 	bootstrap.MustInit(ctx)
 
-	// 2. Initialize circuit breaker manager
-	initializeCircuitBreaker()
-
-	// 3. Start the servers and monitor startup metrics
+	// 2. Start the servers and monitor startup metrics
 	serverPair, err := startServersWithMetrics()
 	if err != nil {
 		resource.LoggerService.Fatal("Failed to start serverPair", zap.Error(err))
 	}
 
-	// 4. Start background tasks such as memory monitoring and uptime updates
+	// 3. Start background tasks such as memory monitoring and uptime updates
 	startBackgroundTasks()
 
-	// 5. Log the time taken to complete startup
+	// 4. Log the time taken to complete startup
 	startupDuration := time.Since(startTime)
 	middleware.ServerStartupDuration.Observe(startupDuration.Seconds())
 	resource.LoggerService.Info("✅ Application started successfully",
@@ -162,9 +155,6 @@ func startBackgroundTasks() {
 	//
 	//  updater logs the current uptime every 30 seconds.
 	startUptimeUpdater()
-
-	// Log the success message
-	resource.LoggerService.Info("Background tasks started")
 }
 
 // startMemoryMonitor starts monitoring memory usage and logs memory statistics
@@ -251,7 +241,7 @@ func setupGracefulShutdown(servers *ServerPair, timeouts AppTimeouts) {
 func shutdownServerWithTimeout(name string, srv *http.Server, timeout time.Duration) {
 	// Log that the server shutdown process has started
 	if resource.LoggerService != nil {
-		resource.LoggerService.Info("Shutting down server",
+		resource.LoggerService.Info("🛑 Shutting down server",
 			zap.String("server", name),
 			zap.Duration("timeout", timeout),
 		)
@@ -276,7 +266,7 @@ func shutdownServerWithTimeout(name string, srv *http.Server, timeout time.Durat
 	} else {
 		// Log a success message if the server stops successfully
 		if resource.LoggerService != nil {
-			resource.LoggerService.Info("Server stopped successfully",
+			resource.LoggerService.Info("✅ Server stopped successfully",
 				zap.String("server", name))
 		} else {
 			// Fallback to standard log if logger is not available
@@ -327,70 +317,4 @@ func handlePanic(r interface{}) {
 		log.Printf("Application panic recovered: %v\n", r)
 		log.Printf("Stack trace: %s\n", string(debug.Stack()))
 	}
-}
-
-// initializeCircuitBreaker initializes the circuit breaker manager and creates
-// some predefined circuit breakers for critical services
-func initializeCircuitBreaker() {
-	// Create circuit breaker manager
-	circuitBreakerManager = middleware.NewCircuitBreakerManager(resource.LoggerService)
-
-	// Create circuit breakers for critical services
-	createServiceCircuitBreakers()
-
-	resource.LoggerService.Info("Circuit breaker manager initialized successfully")
-}
-
-// createServiceCircuitBreakers creates circuit breakers for critical services
-func createServiceCircuitBreakers() {
-	// Database circuit breaker
-	if resource.MySQLClient != nil {
-		circuitBreakerManager.GetOrCreateBreaker("mysql", circuitbreaker.Config{
-			MaxRequests: 5,
-			Interval:    30 * time.Second,
-			Timeout:     60 * time.Second,
-			ReadyToTrip: func(counts circuitbreaker.Counts) bool {
-				return counts.Requests >= 10 &&
-					   float64(counts.TotalFailures)/float64(counts.Requests) >= 0.5
-			},
-			IsSuccessful: func(err error) bool {
-				return err == nil
-			},
-		})
-	}
-
-	// Redis circuit breaker
-	if resource.RedisClient != nil {
-		circuitBreakerManager.GetOrCreateBreaker("redis", circuitbreaker.Config{
-			MaxRequests: 10,
-			Interval:    30 * time.Second,
-			Timeout:     30 * time.Second,
-			ReadyToTrip: func(counts circuitbreaker.Counts) bool {
-				return counts.Requests >= 15 &&
-					   float64(counts.TotalFailures)/float64(counts.Requests) >= 0.6
-			},
-			IsSuccessful: func(err error) bool {
-				return err == nil
-			},
-		})
-	}
-
-	// External API circuit breaker
-	circuitBreakerManager.GetOrCreateBreaker("external-api", circuitbreaker.Config{
-		MaxRequests: 3,
-		Interval:    60 * time.Second,
-		Timeout:     120 * time.Second,
-		ReadyToTrip: func(counts circuitbreaker.Counts) bool {
-			return counts.Requests >= 20 &&
-				   float64(counts.TotalFailures)/float64(counts.Requests) >= 0.7
-		},
-		IsSuccessful: func(err error) bool {
-			return err == nil
-		},
-	})
-}
-
-// GetCircuitBreakerManager returns the global circuit breaker manager
-func GetCircuitBreakerManager() *middleware.CircuitBreakerManager {
-	return circuitBreakerManager
 }

@@ -93,6 +93,11 @@ func InitMySQLClient() error {
 	// Store the initialized GORM database connection in the resource package.
 	// The GORM database connection is a pointer to a GORM database connection.
 	resource.MySQLClient = db
+
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("✅ successfully connected to mysql")
+	}
+
 	return nil
 }
 

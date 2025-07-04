@@ -46,6 +46,9 @@ func MustInit(ctx context.Context) {
 	// Initialize the common resources
 	service.InitCommon(ctx)
 
+	//// Initialize circuit breaker manager
+	//service.InitializeCircuitBreaker()
+	//
 	//// Initialize the ClickHouse
 	//service.InitClickHouse(ctx)
 	//
@@ -82,8 +85,11 @@ func MustInit(ctx context.Context) {
 	//// Initialize the Redis database
 	//service.InitRedis(ctx)
 	//
-	// Initialize the TDengine database
-	// service.InitTDengine(ctx)  // Commented out - TDengine driver not available
+	//Initialize
+	//the
+	//TDengine
+	//database
+	//service.InitTDengine(ctx) // Commented out - TDengine driver not available
 
 	//TaskStart(ctx)
 }

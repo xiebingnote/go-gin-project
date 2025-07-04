@@ -74,7 +74,7 @@ func InitElasticSearchClient() error {
 
 	// Store the initialized client in the global resource
 	resource.ElasticSearchClient = client
-	resource.LoggerService.Info("Successfully connected to Elasticsearch")
+	resource.LoggerService.Info("✅ successfully connected to Elasticsearch")
 
 	return nil
 }
@@ -217,6 +217,10 @@ func CloseElasticSearch() error {
 
 	// Reset the global Elasticsearch client to nil
 	resource.ElasticSearchClient = nil
+
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("✅ successfully closed Elasticsearch connection")
+	}
 
 	// Return nil to indicate success
 	return nil

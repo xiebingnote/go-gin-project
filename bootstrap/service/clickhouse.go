@@ -73,7 +73,7 @@ func InitClickHouseClient() error {
 
 	// Store the initialized client in the global resource
 	resource.ClickHouseClient = db
-	resource.LoggerService.Info("successfully connected to clickhouse")
+	resource.LoggerService.Info("✅ successfully connected to clickhouse")
 
 	return nil
 }
@@ -182,6 +182,10 @@ func CloseClickHouse() error {
 
 	// Reset the global ClickHouse client to nil
 	resource.ClickHouseClient = nil
+
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("✅ successfully closed clickhouse connection")
+	}
 
 	// Return nil to indicate success
 	return nil
