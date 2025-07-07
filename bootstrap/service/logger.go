@@ -311,9 +311,7 @@ func CloseLogger(ctx context.Context) error {
 		// Sync the logger to flush any pending entries
 		if err := resource.LoggerService.Sync(); err != nil {
 			// Check if this is a common sync error that can be safely ignored
-			if isSyncErrorIgnorable(err) {
-				log.Printf("Info: logger sync completed with expected warnings: %v", err)
-			} else {
+			if !isSyncErrorIgnorable(err) {
 				log.Printf("Warning: logger sync failed during close: %v", err)
 			}
 		}

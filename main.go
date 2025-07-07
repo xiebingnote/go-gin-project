@@ -107,7 +107,7 @@ func main() {
 		zap.String("admin_server", serverPair.Admin.Addr),
 	)
 
-	// 6. Set up graceful shutdown to handle termination signals
+	// 5. Set up graceful shutdown to handle termination signals
 	setupGracefulShutdown(serverPair, defaultTimeouts)
 }
 
@@ -182,8 +182,8 @@ func startMemoryMonitor() {
 				zap.Uint64("heap_objects", m.HeapObjects), // Number of allocated heap objects
 			)
 
-			// Trigger GC if allocated memory exceeds 500MB
-			if m.Alloc > 500*1024*1024 {
+			// Trigger GC if allocated memory exceeds 1GB
+			if m.Alloc > 1024*1024*1024 {
 				runtime.GC()
 				resource.LoggerService.Info("Triggered manual GC due to high memory usage")
 			}

@@ -35,3 +35,100 @@ Listen = "0.0.0.0:8081"
 [Version]
 # 版本号
 Version = "1.0.0"
+
+# 服务器选项配置
+[Options]
+# Gin模式: debug, release, test
+# debug: 开发模式，输出详细日志
+# release: 生产模式，性能优化
+# test: 测试模式，用于单元测试
+Mode = "release"
+
+# 是否启用pprof性能分析
+# 启用后，可访问 /debug/pprof/
+# 用于查看程序的性能数据
+EnablePprof = false
+
+# 是否启用Prometheus监控指标
+# 启用后，可访问 /metrics
+EnableMetrics = true
+
+# 信任的代理IP地址列表
+# 用于正确获取客户端真实IP地址
+TrustedProxies = ["127.0.0.1", "::1"]
+
+# 是否启用CORS跨域资源共享
+# 允许前端应用从不同域名访问API
+EnableCORS = true
+
+# 是否启用安全头部
+# 包括XSS保护、内容类型保护、点击劫持保护等
+EnableSecurity = true
+
+# 认证类型: jwt, casbin
+AuthType = "jwt"
+
+# 是否启用认证
+EnableAuth = true
+
+# 读取超时时间（秒）
+ReadTimeout = 30
+
+# 写入超时时间（秒）
+WriteTimeout = 30
+
+# 空闲超时时间（秒）
+IdleTimeout = 60
+
+# 关闭超时时间（秒）
+ShutdownTimeout = 30
+
+# 限流配置
+[Options.RateLimit]
+# 是否使用Redis限流
+# 适用于多实例部署的场景
+EnableRedis = true
+
+# 是否使用内存限流
+# 适用于单实例部署或开发环境
+EnableMemory = false
+
+# 登录接口限流次数（每分钟）
+# 防止暴力破解攻击
+LoginLimit = 10
+
+# API接口限流次数（每分钟）
+# 防止API滥用
+APILimit = 100
+
+# 公共接口限流次数（每分钟）
+# 对不需要认证的接口进行限流
+PublicLimit = 50
+
+# 开发环境配置示例
+# 可以创建 conf/service-dev.toml 用于开发环境
+# [Options]
+# Mode = "debug"
+# EnablePprof = true
+# EnableAuth = false
+# [Options.RateLimit]
+# EnableRedis = false
+# EnableMemory = true
+# LoginLimit = 100
+# APILimit = 1000
+# PublicLimit = 500
+
+# 生产环境配置示例
+# 可以创建 conf/service-prod.toml 用于生产环境
+# [Options]
+# Mode = "release"
+# EnablePprof = false
+# EnableAuth = true
+# EnableSecurity = true
+# TrustedProxies = ["10.0.0.0/8"]
+# [Options.RateLimit]
+# EnableRedis = true
+# EnableMemory = false
+# LoginLimit = 5
+# APILimit = 50
+# PublicLimit = 20
