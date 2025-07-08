@@ -184,7 +184,7 @@ func CloseClickHouse() error {
 	resource.ClickHouseClient = nil
 
 	if resource.LoggerService != nil {
-		resource.LoggerService.Info("✅ successfully closed clickhouse connection")
+		resource.LoggerService.Info("🛑 successfully closed clickhouse connection")
 	}
 
 	// Return nil to indicate success

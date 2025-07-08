@@ -325,7 +325,7 @@ func CloseRedis(ctx context.Context) error {
 	resource.RedisClient = nil
 
 	if resource.LoggerService != nil {
-		resource.LoggerService.Info("✅ successfully closed redis client connection")
+		resource.LoggerService.Info("🛑 successfully closed redis client connection")
 	}
 
 	return nil

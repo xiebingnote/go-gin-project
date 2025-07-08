@@ -400,9 +400,9 @@ func CloseKafka() error {
 
 	// Log a success message to indicate that all connections have been closed
 	if resource.LoggerService != nil {
-		resource.LoggerService.Info("✅ successfully closed all kafka connections")
+		resource.LoggerService.Info("🛑 successfully closed all kafka connections")
 	}
-	
+
 	return nil
 }
 

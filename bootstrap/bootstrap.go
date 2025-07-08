@@ -220,7 +220,9 @@ func Close(ctx context.Context) error {
 
 	// Stop all the cron jobs if the scheduler is initialized.
 	if resource.Corn != nil {
-		resource.Corn.StopJobs()
+		if err = resource.Corn.StopJobs(); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	// Close the Logger service (should be last to capture all shutdown logs).

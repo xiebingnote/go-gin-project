@@ -261,6 +261,10 @@ func CloseMySQL() error {
 	// Reset the global MySQL client to nil.
 	resource.MySQLClient = nil
 
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info("🛑 successfully closed MySQL connection")
+	}
+
 	// Return nil to indicate success.
 	return nil
 }

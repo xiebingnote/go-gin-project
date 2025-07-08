@@ -266,11 +266,11 @@ func shutdownServerWithTimeout(name string, srv *http.Server, timeout time.Durat
 	} else {
 		// Log a success message if the server stops successfully
 		if resource.LoggerService != nil {
-			resource.LoggerService.Info("✅ Server stopped successfully",
+			resource.LoggerService.Info("🛑 Server stopped successfully",
 				zap.String("server", name))
 		} else {
 			// Fallback to standard log if logger is not available
-			log.Printf("✅ Server stopped successfully: %s", name)
+			log.Printf("🛑 Server stopped successfully: %s", name)
 		}
 	}
 }

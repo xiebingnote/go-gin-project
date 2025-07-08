@@ -244,7 +244,7 @@ func ClosePostgresql() error {
 	resource.PostgresqlClient = nil
 
 	if resource.LoggerService != nil {
-		resource.LoggerService.Info("✅ successfully closed postgresql connection")
+		resource.LoggerService.Info("🛑 successfully closed postgresql connection")
 	}
 
 	// Return nil to indicate success.

@@ -314,7 +314,7 @@ func CloseManticore(ctx context.Context) error {
 	}
 
 	if resource.LoggerService != nil {
-		resource.LoggerService.Info("✅ successfully closed manticore client")
+		resource.LoggerService.Info("🛑 successfully closed manticore client")
 	}
 
 	return nil

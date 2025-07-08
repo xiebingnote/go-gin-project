@@ -340,7 +340,7 @@ func CloseCron(ctx context.Context) error {
 	resource.Corn = nil
 
 	if resource.LoggerService != nil {
-		resource.LoggerService.Info("✅ successfully closed cron scheduler")
+		resource.LoggerService.Info("🛑 successfully closed cron scheduler")
 	}
 
 	return nil

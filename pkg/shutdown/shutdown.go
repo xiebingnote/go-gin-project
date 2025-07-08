@@ -11,13 +11,37 @@ import (
 	"time"
 
 	"github.com/xiebingnote/go-gin-project/library/resource"
+	"go.uber.org/zap"
 )
 
 var _ Hook = (*hook)(nil)
 
+// Config holds the configuration for shutdown behavior
+type Config struct {
+	// TaskTimeout is the timeout for each individual cleanup task
+	TaskTimeout time.Duration
+	// TotalTimeout is the total timeout for all cleanup tasks
+	TotalTimeout time.Duration
+}
+
+// DefaultConfig returns the default shutdown configuration
+func DefaultConfig() Config {
+	return Config{
+		TaskTimeout:  5 * time.Second,
+		TotalTimeout: 30 * time.Second,
+	}
+}
+
+// CleanupFunc represents a cleanup function that can receive context
+type CleanupFunc func(ctx context.Context) error
+
+// LegacyCleanupFunc represents a legacy cleanup function without context
+type LegacyCleanupFunc func()
+
 type hook struct {
 	signalChan chan os.Signal
 	mu         sync.Mutex
+	config     Config
 }
 
 type Hook interface {
@@ -25,19 +49,22 @@ type Hook interface {
 	//
 	// The returned Hook will listen for the signals in addition to the signals
 	// already being listened to. If a signal is received, the functions passed
-	// to the Close method will be executed in sequence. If no Close method has
-	// been called, the program will exit with the signal as the exit status.
+	// to the Close method will be executed in sequence.
 	WithSignals(signals ...syscall.Signal) Hook
 
-	// Close executes the functions passed to it in sequence when a signal is
-	// received or when the timeout is reached. If no functions are passed, the
-	// program will exit with the signal as the exit status. If a timeout is
-	// specified, the functions will be executed after the timeout is reached.
+	// Close executes the legacy cleanup functions when a signal is received.
+	// This method is kept for backward compatibility.
 	//
 	// It is safe to call Close multiple times from different goroutines. The
 	// functions will be executed in the order they were passed to the last call
 	// to Close.
-	Close(funcs ...func())
+	Close(funcs ...LegacyCleanupFunc)
+
+	// CloseWithContext executes the cleanup functions with context when a signal is received.
+	// This is the preferred method as it provides better error handling and timeout control.
+	//
+	// Returns a slice of errors from failed cleanup tasks.
+	CloseWithContext(funcs ...CleanupFunc) []error
 }
 
 // NewHook creates and returns a new Hook that listens for SIGINT and SIGTERM signals.
@@ -46,6 +73,7 @@ type Hook interface {
 func NewHook() Hook {
 	h := &hook{
 		signalChan: make(chan os.Signal, 1), // Channel for receiving OS signals
+		config:     DefaultConfig(),         // Use default configuration
 	}
 	// Listen for SIGINT and SIGTERM signals
 	return h.WithSignals(syscall.SIGINT, syscall.SIGTERM)
@@ -55,8 +83,7 @@ func NewHook() Hook {
 //
 // The returned Hook will listen for the signals in addition to the signals
 // already being listened to. If a signal is received, the functions passed
-// to the Close method will be executed in sequence. If no Close method has
-// been called, the program will exit with the signal as the exit status.
+// to the Close method will be executed in sequence.
 func (h *hook) WithSignals(signals ...syscall.Signal) Hook {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -68,68 +95,92 @@ func (h *hook) WithSignals(signals ...syscall.Signal) Hook {
 	return h
 }
 
-// Close executes the functions passed to it in sequence when a signal is received
-// or when the timeout is reached. If no functions are passed, the program will exit
-// with the signal as the exit status. If a timeout is specified, the functions will
-// be executed after the timeout is reached.
+// logInfo logs an info message using the structured logger if available, otherwise falls back to standard log
+func logInfo(msg string, fields ...zap.Field) {
+	if resource.LoggerService != nil {
+		resource.LoggerService.Info(msg, fields...)
+	} else {
+		log.Println("INFO:", msg)
+	}
+}
+
+// logError logs an error message using the structured logger if available, otherwise falls back to standard log
+func logError(msg string, fields ...zap.Field) {
+	if resource.LoggerService != nil {
+		resource.LoggerService.Error(msg, fields...)
+	} else {
+		log.Println("ERROR:", msg)
+	}
+}
+
+// logWarn logs a warning message using the structured logger if available, otherwise falls back to standard log
+func logWarn(msg string, fields ...zap.Field) {
+	if resource.LoggerService != nil {
+		resource.LoggerService.Warn(msg, fields...)
+	} else {
+		log.Println("WARN:", msg)
+	}
+}
+
+// Close executes the legacy cleanup functions when a signal is received.
+// This method is kept for backward compatibility.
 //
 // It is safe to call Close multiple times from different goroutines. The
-// functions will be executed in the order they were passed to the last call to
-// Close.
-//
-// The functions passed to Close will be executed in a separate goroutine. If a
-// function blocks indefinitely, it will be canceled after the timeout is
-// reached. If all the functions complete successfully, the program will exit
-// after all the functions have completed. If any of the functions fail, the
-// program will exit immediately after the first failure.
-//
-// The timeout for each function is 5 seconds. The total timeout for all the
-// functions is 30 seconds. If the total timeout is reached before all the
-// functions have completed, the program will exit immediately.
-func (h *hook) Close(funcs ...func()) {
-	// Receive the signal that triggered the shutdown
-	sig := <-h.signalChan
-	log.Printf(fmt.Sprintf("🛑 Received signal: %s", sig))
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info(fmt.Sprintf("🛑 Received signal: %s", sig))
+// functions will be executed in the order they were passed to the last call
+// to Close.
+func (h *hook) Close(funcs ...LegacyCleanupFunc) {
+	// Convert legacy functions to context-aware functions
+	contextFuncs := make([]CleanupFunc, len(funcs))
+	for i, f := range funcs {
+		contextFuncs[i] = func(ctx context.Context) error {
+			f()
+			return nil
+		}
 	}
 
-	// Stop listening for signals to prevent the program from exiting
-	// immediately
+	// Use the new implementation
+	h.CloseWithContext(contextFuncs...)
+}
+
+// CloseWithContext executes the cleanup functions with context when a signal is received.
+// This is the preferred method as it provides better error handling and timeout control.
+//
+// Returns a slice of errors from failed cleanup tasks.
+func (h *hook) CloseWithContext(funcs ...CleanupFunc) []error {
+	// Receive the signal that triggered the shutdown
+	sig := <-h.signalChan
+	logInfo("🛑 Received shutdown signal", zap.String("signal", sig.String()))
+
+	// Stop listening for signals to prevent the program from exiting immediately
 	signal.Stop(h.signalChan)
 
 	// Create a context with a timeout for the shutdown process
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), h.config.TotalTimeout)
 	defer cancel()
+
+	// Track errors from cleanup tasks
+	var errorsMu sync.Mutex
+	var cleanupErrors []error
 
 	// Use a WaitGroup to ensure all cleanup tasks complete
 	var wg sync.WaitGroup
-	for _, f := range funcs {
+	for i, f := range funcs {
 		wg.Add(1)
-		go func(cleanup func()) {
+		go func(taskIndex int, cleanup CleanupFunc) {
 			defer wg.Done()
 
 			// Set a timeout for each cleanup task
-			taskCtx, taskCancel := context.WithTimeout(shutdownCtx, 5*time.Second)
+			taskCtx, taskCancel := context.WithTimeout(shutdownCtx, h.config.TaskTimeout)
 			defer taskCancel()
 
-			// Execute the cleanup task in a separate goroutine
-			done := make(chan struct{})
-			go func() {
-				cleanup()
-				close(done)
-			}()
-
-			// Wait for the cleanup task to complete or timeout
-			select {
-			case <-done:
-			case <-taskCtx.Done():
-				log.Println(fmt.Sprintf("⏰ Cleanup task timeout"))
-				if resource.LoggerService != nil {
-					resource.LoggerService.Error(fmt.Sprintf("⏰ Cleanup task timeout"))
-				}
+			// Execute the cleanup task
+			taskErr := h.executeCleanupTask(taskCtx, taskIndex, cleanup)
+			if taskErr != nil {
+				errorsMu.Lock()
+				cleanupErrors = append(cleanupErrors, taskErr)
+				errorsMu.Unlock()
 			}
-		}(f)
+		}(i, f)
 	}
 
 	// Wait for all cleanup tasks to complete or the total timeout to be reached
@@ -139,17 +190,63 @@ func (h *hook) Close(funcs ...func()) {
 		close(done)
 	}()
 
-	// Wait for all cleanup tasks to complete or the total timeout to be reached
+	// Wait for completion or timeout
 	select {
 	case <-done:
-		log.Println(fmt.Sprintf("🎉 All cleanup tasks completed"))
-		if resource.LoggerService != nil {
-			resource.LoggerService.Info(fmt.Sprintf("🎉 All cleanup tasks completed"))
+		if len(cleanupErrors) == 0 {
+			logInfo("🎉 All cleanup tasks completed successfully")
+		} else {
+			logWarn("⚠️ Some cleanup tasks failed", zap.Int("failed_count", len(cleanupErrors)))
 		}
 	case <-shutdownCtx.Done():
-		log.Println(fmt.Sprintf("⏰ Shutdown timeout, force exit"))
-		if resource.LoggerService != nil {
-			resource.LoggerService.Error(fmt.Sprintf("⏰ Shutdown timeout, force exit"))
+		logError("⏰ Shutdown timeout reached, forcing exit",
+			zap.Duration("timeout", h.config.TotalTimeout))
+	}
+
+	return cleanupErrors
+}
+
+// executeCleanupTask executes a single cleanup task with proper error handling and timeout
+func (h *hook) executeCleanupTask(ctx context.Context, taskIndex int, cleanup CleanupFunc) error {
+	// Create a channel to receive the result of the cleanup task
+	resultChan := make(chan error, 1)
+
+	// Execute the cleanup task in a separate goroutine
+	go func() {
+		defer func() {
+			// Recover from any panic in the cleanup function
+			if r := recover(); r != nil {
+				err := fmt.Errorf("cleanup task %d panicked: %v", taskIndex, r)
+				logError("Cleanup task panicked",
+					zap.Int("task_index", taskIndex),
+					zap.Any("panic", r))
+				resultChan <- err
+			}
+		}()
+
+		// Execute the cleanup function
+		err := cleanup(ctx)
+		resultChan <- err
+	}()
+
+	// Wait for the cleanup task to complete or timeout
+	select {
+	case err := <-resultChan:
+		if err != nil {
+			logError("Cleanup task failed",
+				zap.Int("task_index", taskIndex),
+				zap.Error(err))
+			return fmt.Errorf("cleanup task %d failed: %w", taskIndex, err)
 		}
+		//logInfo("🛑 Cleanup task completed successfully",
+		//	zap.Int("task_index", taskIndex))
+		return nil
+
+	case <-ctx.Done():
+		err := fmt.Errorf("cleanup task %d timeout after %v", taskIndex, h.config.TaskTimeout)
+		logError("Cleanup task timeout",
+			zap.Int("task_index", taskIndex),
+			zap.Duration("timeout", h.config.TaskTimeout))
+		return err
 	}
 }

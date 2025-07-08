@@ -443,7 +443,7 @@ func CloseTDengine(ctx context.Context) error {
 	resource.TDengineClient = nil
 
 	if resource.LoggerService != nil {
-		resource.LoggerService.Info("✅ successfully closed tdengine client")
+		resource.LoggerService.Info("🛑 successfully closed tdengine client")
 	}
 
 	return nil

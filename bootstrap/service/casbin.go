@@ -327,8 +327,8 @@ func CloseCasbin(ctx context.Context) error {
 	resource.Enforcer = nil
 
 	if resource.LoggerService != nil {
-		resource.LoggerService.Info("✅ successfully closed casbin enforcer")
+		resource.LoggerService.Info("🛑 successfully closed casbin enforcer")
 	}
-	
+
 	return nil
 }

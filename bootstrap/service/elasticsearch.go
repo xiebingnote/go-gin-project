@@ -219,7 +219,7 @@ func CloseElasticSearch() error {
 	resource.ElasticSearchClient = nil
 
 	if resource.LoggerService != nil {
-		resource.LoggerService.Info("✅ successfully closed Elasticsearch connection")
+		resource.LoggerService.Info("🛑 successfully closed Elasticsearch connection")
 	}
 
 	// Return nil to indicate success

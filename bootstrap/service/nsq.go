@@ -415,7 +415,7 @@ func CloseNsq(ctx context.Context) error {
 	}
 
 	if resource.LoggerService != nil {
-		resource.LoggerService.Info("✅ NSQ client shutdown completed successfully")
+		resource.LoggerService.Info("🛑 NSQ client shutdown completed successfully")
 	}
 
 	return nil
