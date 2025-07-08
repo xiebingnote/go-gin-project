@@ -1,0 +1,92 @@
+flowchart TD
+    Start([应用程序启动]) --> Init[记录启动时间]
+    Init --> Panic[设置Panic处理器]
+    Panic --> Bootstrap[bootstrap.MustInit]
+
+    subgraph "Bootstrap初始化过程"
+        Bootstrap --> HookStd[配置标准日志]
+        HookStd --> InitConfig[初始化配置]
+        InitConfig --> InitLogger[初始化日志服务]
+        InitLogger --> InitCommon[初始化公共资源]
+        InitCommon --> InitServices[初始化外部服务]
+
+        subgraph "外部服务初始化"
+            InitServices --> MySQL[MySQL数据库]
+            InitServices --> PostgreSQL[PostgreSQL数据库]
+            InitServices --> Redis[Redis缓存]
+            InitServices --> MongoDB[MongoDB数据库]
+            InitServices --> ClickHouse[ClickHouse分析库]
+            InitServices --> TDengine[TDengine时序库]
+            InitServices --> Elasticsearch[Elasticsearch搜索]
+            InitServices --> Manticore[ManticoreSearch搜索]
+            InitServices --> Kafka[Kafka消息队列]
+            InitServices --> NSQ[NSQ消息队列]
+            InitServices --> Etcd[etcd服务发现]
+            InitServices --> Casbin[Casbin权限控制]
+            InitServices --> Cron[定时任务调度器]
+            InitServices --> CircuitBreaker[熔断器管理器]
+        end
+    end
+
+    Bootstrap --> StartServers[启动服务器]
+
+    subgraph "服务器启动过程"
+        StartServers --> CreateMain[创建主服务器:8080]
+        StartServers --> CreateAdmin[创建管理服务器:8081]
+
+        CreateMain --> ConfigMain[配置主服务器]
+        ConfigMain --> SetupMiddleware[设置中间件栈]
+        SetupMiddleware --> SetupRoutes[设置业务路由]
+
+        CreateAdmin --> ConfigAdmin[配置管理服务器]
+        ConfigAdmin --> SetupMetrics[设置监控端点]
+        SetupMetrics --> SetupPprof[设置性能分析]
+        SetupPprof --> SetupHealth[设置健康检查]
+
+        SetupRoutes --> StartMainServer[启动主服务器]
+        SetupHealth --> StartAdminServer[启动管理服务器]
+    end
+
+    StartServers --> WaitServers[等待服务器启动]
+    WaitServers --> ServerCheck{服务器启动检查}
+    ServerCheck -->|失败| ServerError[记录错误并退出]
+    ServerCheck -->|成功| StartBackground[启动后台任务]
+
+    subgraph "后台任务"
+        StartBackground --> MemoryMonitor[内存监控任务<br/>每5分钟检查]
+        StartBackground --> UptimeUpdater[运行时间更新<br/>每30秒更新]
+    end
+
+    StartBackground --> LogSuccess[记录启动成功]
+    LogSuccess --> SetupShutdown[设置优雅关闭]
+
+    subgraph "优雅关闭设置"
+        SetupShutdown --> SignalHandler[信号处理器]
+        SignalHandler --> ShutdownMain[关闭主服务器]
+        ShutdownMain --> ShutdownAdmin[关闭管理服务器]
+        ShutdownAdmin --> CleanupResources[清理资源]
+        CleanupResources --> CloseConnections[关闭数据库连接]
+        CloseConnections --> StopTasks[停止后台任务]
+        StopTasks --> CloseLogger[关闭日志服务]
+    end
+
+    SetupShutdown --> Running[应用程序运行中]
+    Running --> WaitSignal[等待终止信号]
+
+%% 错误处理
+    ServerError --> Exit[程序退出]
+
+%% 样式定义
+    classDef startStyle fill:#e8f5e8,stroke:#2e7d32,stroke-width:3px
+    classDef processStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef serverStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef taskStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef errorStyle fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef endStyle fill:#e0f2f1,stroke:#00695c,stroke-width:3px
+
+    class Start,Running startStyle
+    class Init,Panic,Bootstrap,HookStd,InitConfig,InitLogger,InitCommon processStyle
+    class StartServers,CreateMain,CreateAdmin,ConfigMain,ConfigAdmin,SetupMiddleware,SetupRoutes,SetupMetrics,SetupPprof,SetupHealth,StartMainServer,StartAdminServer serverStyle
+    class StartBackground,MemoryMonitor,UptimeUpdater,SetupShutdown,SignalHandler,ShutdownMain,ShutdownAdmin,CleanupResources,CloseConnections,StopTasks,CloseLogger taskStyle
+    class ServerError,Exit errorStyle
+    class LogSuccess,WaitSignal endStyle

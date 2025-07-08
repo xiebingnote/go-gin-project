@@ -1,0 +1,251 @@
+graph TB
+    subgraph "外部用户"
+        Users[用户]
+        API_Clients[API客户端]
+        Mobile[移动应用]
+    end
+
+    subgraph "CDN/边缘节点"
+        CDN[CDN<br/>静态资源分发]
+        Edge[边缘节点<br/>就近访问]
+    end
+
+    subgraph "负载均衡层"
+        LB[负载均衡器<br/>Nginx/HAProxy]
+        SSL[SSL终端<br/>HTTPS证书]
+    end
+
+    subgraph "Kubernetes集群"
+        subgraph "应用服务层"
+            Pod1[应用Pod1<br/>go-gin-project:8080]
+            Pod2[应用Pod2<br/>go-gin-project:8080]
+            Pod3[应用Pod3<br/>go-gin-project:8080]
+
+            AdminPod1[管理Pod1<br/>admin:8081]
+            AdminPod2[管理Pod2<br/>admin:8081]
+        end
+
+        subgraph "服务发现"
+            K8sService[Kubernetes Service]
+            Ingress[Ingress Controller]
+            DNS[内部DNS]
+        end
+
+        subgraph "配置管理"
+            ConfigMap[ConfigMap<br/>配置文件]
+            Secret[Secret<br/>敏感信息]
+            PVC[PVC<br/>持久化存储]
+        end
+    end
+
+    subgraph "数据存储层"
+        subgraph "关系型数据库集群"
+            MySQLMaster[(MySQL主库)]
+            MySQLSlave1[(MySQL从库1)]
+            MySQLSlave2[(MySQL从库2)]
+
+            PGMaster[(PostgreSQL主库)]
+            PGSlave[(PostgreSQL从库)]
+        end
+
+        subgraph "缓存集群"
+            RedisCluster[Redis集群<br/>主从+哨兵]
+            RedisCache1[(Redis节点1)]
+            RedisCache2[(Redis节点2)]
+            RedisCache3[(Redis节点3)]
+        end
+
+        subgraph "NoSQL集群"
+            MongoRS[MongoDB副本集]
+            MongoNode1[(MongoDB节点1)]
+            MongoNode2[(MongoDB节点2)]
+            MongoNode3[(MongoDB节点3)]
+        end
+
+        subgraph "分析数据库"
+            CHCluster[ClickHouse集群]
+            CHNode1[(CH节点1)]
+            CHNode2[(CH节点2)]
+            CHNode3[(CH节点3)]
+
+            TDCluster[TDengine集群]
+        end
+
+        subgraph "搜索引擎集群"
+            ESCluster[Elasticsearch集群]
+            ESNode1[(ES节点1)]
+            ESNode2[(ES节点2)]
+            ESNode3[(ES节点3)]
+        end
+    end
+
+    subgraph "消息队列集群"
+        KafkaCluster[Kafka集群]
+        Kafka1[(Kafka Broker1)]
+        Kafka2[(Kafka Broker2)]
+        Kafka3[(Kafka Broker3)]
+        Zookeeper[Zookeeper集群]
+
+        NSQCluster[NSQ集群]
+        NSQLookup[NSQ Lookup]
+        NSQd1[NSQd节点1]
+        NSQd2[NSQd节点2]
+    end
+
+    subgraph "监控系统"
+        Prometheus[Prometheus<br/>指标收集]
+        Grafana[Grafana<br/>可视化面板]
+        AlertManager[AlertManager<br/>告警管理]
+
+        ELKStack[ELK Stack]
+        Elasticsearch_Log[(Elasticsearch<br/>日志存储)]
+        Logstash[Logstash<br/>日志处理]
+        Kibana[Kibana<br/>日志分析]
+
+        Jaeger[Jaeger<br/>链路追踪]
+    end
+
+    subgraph "运维工具"
+        CI_CD[CI/CD流水线<br/>Jenkins/GitLab]
+        Registry[镜像仓库<br/>Harbor/Docker Hub]
+        Backup[备份系统<br/>定时备份]
+        Monitor[监控告警<br/>PagerDuty/钉钉]
+    end
+
+%% 连接关系
+    Users --> CDN
+    API_Clients --> CDN
+    Mobile --> CDN
+
+    CDN --> LB
+    Edge --> LB
+    LB --> SSL
+    SSL --> Ingress
+
+    Ingress --> K8sService
+    K8sService --> Pod1
+    K8sService --> Pod2
+    K8sService --> Pod3
+
+    K8sService --> AdminPod1
+    K8sService --> AdminPod2
+
+    Pod1 --> ConfigMap
+    Pod2 --> ConfigMap
+    Pod3 --> ConfigMap
+
+    Pod1 --> Secret
+    Pod2 --> Secret
+    Pod3 --> Secret
+
+%% 数据库连接
+    Pod1 --> MySQLMaster
+    Pod2 --> MySQLMaster
+    Pod3 --> MySQLMaster
+
+    MySQLMaster --> MySQLSlave1
+    MySQLMaster --> MySQLSlave2
+
+    Pod1 --> PGMaster
+    Pod2 --> PGMaster
+    Pod3 --> PGMaster
+    PGMaster --> PGSlave
+
+    Pod1 --> RedisCluster
+    Pod2 --> RedisCluster
+    Pod3 --> RedisCluster
+
+    RedisCluster --> RedisCache1
+    RedisCluster --> RedisCache2
+    RedisCluster --> RedisCache3
+
+    Pod1 --> MongoRS
+    Pod2 --> MongoRS
+    Pod3 --> MongoRS
+
+    MongoRS --> MongoNode1
+    MongoRS --> MongoNode2
+    MongoRS --> MongoNode3
+
+    Pod1 --> CHCluster
+    Pod2 --> CHCluster
+    Pod3 --> CHCluster
+
+    CHCluster --> CHNode1
+    CHCluster --> CHNode2
+    CHCluster --> CHNode3
+
+    Pod1 --> TDCluster
+    Pod2 --> TDCluster
+    Pod3 --> TDCluster
+
+    Pod1 --> ESCluster
+    Pod2 --> ESCluster
+    Pod3 --> ESCluster
+
+    ESCluster --> ESNode1
+    ESCluster --> ESNode2
+    ESCluster --> ESNode3
+
+%% 消息队列连接
+    Pod1 --> KafkaCluster
+    Pod2 --> KafkaCluster
+    Pod3 --> KafkaCluster
+
+    KafkaCluster --> Kafka1
+    KafkaCluster --> Kafka2
+    KafkaCluster --> Kafka3
+    KafkaCluster --> Zookeeper
+
+    Pod1 --> NSQCluster
+    Pod2 --> NSQCluster
+    Pod3 --> NSQCluster
+
+    NSQCluster --> NSQLookup
+    NSQCluster --> NSQd1
+    NSQCluster --> NSQd2
+
+%% 监控连接
+    AdminPod1 --> Prometheus
+    AdminPod2 --> Prometheus
+    Prometheus --> Grafana
+    Prometheus --> AlertManager
+
+    Pod1 --> ELKStack
+    Pod2 --> ELKStack
+    Pod3 --> ELKStack
+
+    ELKStack --> Logstash
+    Logstash --> Elasticsearch_Log
+    Elasticsearch_Log --> Kibana
+
+    Pod1 --> Jaeger
+    Pod2 --> Jaeger
+    Pod3 --> Jaeger
+
+%% 运维连接
+    CI_CD --> Registry
+    Registry --> Pod1
+    Registry --> Pod2
+    Registry --> Pod3
+
+    Backup --> MySQLMaster
+    Backup --> PGMaster
+    Backup --> MongoRS
+
+    Monitor --> AlertManager
+
+%% 样式定义
+    classDef userStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef infraStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef appStyle fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    classDef dbStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef monitorStyle fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef opsStyle fill:#f1f8e9,stroke:#689f38,stroke-width:2px
+
+    class Users,API_Clients,Mobile userStyle
+    class CDN,Edge,LB,SSL,Ingress,K8sService,DNS infraStyle
+    class Pod1,Pod2,Pod3,AdminPod1,AdminPod2,ConfigMap,Secret,PVC appStyle
+    class MySQLMaster,MySQLSlave1,MySQLSlave2,PGMaster,PGSlave,RedisCluster,RedisCache1,RedisCache2,RedisCache3,MongoRS,MongoNode1,MongoNode2,MongoNode3,CHCluster,CHNode1,CHNode2,CHNode3,TDCluster,ESCluster,ESNode1,ESNode2,ESNode3,KafkaCluster,Kafka1,Kafka2,Kafka3,Zookeeper,NSQCluster,NSQLookup,NSQd1,NSQd2 dbStyle
+    class Prometheus,Grafana,AlertManager,ELKStack,Elasticsearch_Log,Logstash,Kibana,Jaeger monitorStyle
+    class CI_CD,Registry,Backup,Monitor opsStyle

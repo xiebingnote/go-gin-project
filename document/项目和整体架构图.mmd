@@ -1,0 +1,146 @@
+graph TB
+    %% 客户端层
+    Client[客户端应用]
+    Browser[浏览器]
+    Mobile[移动应用]
+
+    %% 负载均衡
+    LB[负载均衡器]
+
+    %% 应用服务器
+    subgraph "应用服务器集群"
+        App1[应用实例1<br/>:8080]
+        App2[应用实例2<br/>:8080]
+        App3[应用实例N<br/>:8080]
+    end
+
+    %% 管理服务器
+    subgraph "管理服务器"
+        Admin[管理接口<br/>:8081]
+        Metrics["/metrics<br/>Prometheus指标"]
+        Pprof["/debug/pprof<br/>性能分析"]
+        Health["/health<br/>健康检查"]
+    end
+
+    %% 中间件层
+    subgraph "中间件层"
+        Auth[认证中间件<br/>JWT/Casbin]
+        RateLimit[限流中间件<br/>Redis/Memory]
+        CircuitBreaker[熔断器<br/>Circuit Breaker]
+        Security[安全中间件<br/>CORS/Headers]
+        Logging[日志中间件<br/>Zap Logger]
+    end
+
+    %% 业务层
+    subgraph "业务逻辑层"
+        Controller[控制器层<br/>Controllers]
+        Service[服务层<br/>Business Logic]
+        DAO[数据访问层<br/>Data Access Objects]
+    end
+
+    %% 数据存储层
+    subgraph "关系型数据库"
+        MySQL[(MySQL<br/>主数据库)]
+        PostgreSQL[(PostgreSQL<br/>备用数据库)]
+    end
+
+    subgraph "NoSQL数据库"
+        Redis[(Redis<br/>缓存/会话)]
+        MongoDB[(MongoDB<br/>文档存储)]
+    end
+
+    subgraph "分析数据库"
+        ClickHouse[(ClickHouse<br/>列式分析)]
+        TDengine[(TDengine<br/>时序数据)]
+    end
+
+    subgraph "搜索引擎"
+        Elasticsearch[(Elasticsearch<br/>全文搜索)]
+        Manticore[(ManticoreSearch<br/>搜索引擎)]
+    end
+
+    %% 消息队列
+    subgraph "消息队列"
+        Kafka[(Kafka<br/>分布式消息)]
+        NSQ[(NSQ<br/>轻量级消息)]
+    end
+
+    %% 服务发现
+    subgraph "服务发现"
+        Etcd[(etcd<br/>配置中心)]
+    end
+
+    %% 监控系统
+    subgraph "监控系统"
+        Prometheus[Prometheus<br/>指标收集]
+        Grafana[Grafana<br/>可视化]
+        AlertManager[AlertManager<br/>告警]
+    end
+
+    %% 日志系统
+    subgraph "日志系统"
+        LogFiles[日志文件<br/>本地存储]
+        ELK[ELK Stack<br/>日志分析]
+    end
+
+
+    %% 连接关系
+    Client --> LB
+    Browser --> LB
+    Mobile --> LB
+
+    LB --> App1
+    LB --> App2
+    LB --> App3
+
+    App1 --> Auth
+    App2 --> Auth
+    App3 --> Auth
+
+    Auth --> RateLimit
+    RateLimit --> CircuitBreaker
+    CircuitBreaker --> Security
+    Security --> Logging
+    Logging --> Controller
+
+    Controller --> Service
+    Service --> DAO
+
+    DAO --> MySQL
+    DAO --> PostgreSQL
+    DAO --> Redis
+    DAO --> MongoDB
+    DAO --> ClickHouse
+    DAO --> TDengine
+    DAO --> Elasticsearch
+    DAO --> Manticore
+
+    Service --> Kafka
+    Service --> NSQ
+    Service --> Etcd
+
+    Admin --> Metrics
+    Admin --> Pprof
+    Admin --> Health
+
+    Metrics --> Prometheus
+    Prometheus --> Grafana
+    Prometheus --> AlertManager
+
+    Logging --> LogFiles
+    LogFiles --> ELK
+
+    %% 样式
+    classDef clientStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef serverStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef middlewareStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef businessStyle fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef dataStyle fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    classDef monitorStyle fill:#f1f8e9,stroke:#33691e,stroke-width:2px
+
+    class Client,Browser,Mobile clientStyle
+    class App1,App2,App3,Admin serverStyle
+    class Auth,RateLimit,CircuitBreaker,Security,Logging middlewareStyle
+    class Controller,Service,DAO businessStyle
+    class MySQL,PostgreSQL,Redis,MongoDB,ClickHouse,TDengine,Elasticsearch,Manticore,Kafka,NSQ,Etcd dataStyle
+    class Prometheus,Grafana,AlertManager,LogFiles,ELK monitorStyle

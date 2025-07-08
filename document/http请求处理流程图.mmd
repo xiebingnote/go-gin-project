@@ -1,0 +1,105 @@
+sequenceDiagram
+    participant Client as 客户端
+    participant LB as 负载均衡器
+    participant Server as Gin服务器
+    participant Auth as 认证中间件
+    participant RateLimit as 限流中间件
+    participant CB as 熔断器中间件
+    participant Security as 安全中间件
+    participant Logger as 日志中间件
+    participant Controller as 控制器
+    participant Service as 业务服务
+    participant DAO as 数据访问层
+    participant DB as 数据库
+    participant Cache as Redis缓存
+    participant MQ as 消息队列
+
+%% 请求阶段
+    Client->>+LB: HTTP请求
+    LB->>+Server: 转发请求
+
+%% 中间件处理链
+    Server->>+Auth: 请求进入认证中间件
+
+    alt JWT认证
+        Auth->>Auth: 验证JWT Token
+        Auth->>Auth: 提取用户信息
+    else Casbin认证
+        Auth->>Auth: 验证用户角色
+        Auth->>Auth: 检查权限策略
+    end
+
+    Auth->>+RateLimit: 认证通过，进入限流中间件
+
+    alt Redis限流
+        RateLimit->>Cache: 检查限流计数器
+        Cache-->>RateLimit: 返回当前计数
+        RateLimit->>Cache: 更新计数器
+    else 内存限流
+        RateLimit->>RateLimit: 检查内存计数器
+    end
+
+    RateLimit->>+CB: 限流通过，进入熔断器
+    CB->>CB: 检查熔断器状态
+
+    alt 熔断器开启
+        CB-->>Client: 返回503服务不可用
+    else 熔断器关闭/半开
+        CB->>+Security: 进入安全中间件
+    end
+
+    Security->>Security: 设置安全头部
+    Security->>Security: CORS处理
+    Security->>+Logger: 进入日志中间件
+
+    Logger->>Logger: 记录请求日志
+    Logger->>+Controller: 进入业务控制器
+
+%% 业务处理阶段
+    Controller->>Controller: 参数验证
+    Controller->>+Service: 调用业务服务
+
+    Service->>Service: 业务逻辑处理
+    Service->>+DAO: 调用数据访问层
+
+%% 数据访问阶段
+    DAO->>+Cache: 检查缓存
+    Cache-->>-DAO: 缓存结果
+
+    alt 缓存命中
+        DAO->>DAO: 使用缓存数据
+    else 缓存未命中
+        DAO->>+DB: 查询数据库
+        DB-->>-DAO: 返回数据
+        DAO->>Cache: 更新缓存
+    end
+
+%% 异步处理
+    Service->>+MQ: 发送异步消息
+    MQ-->>-Service: 消息发送确认
+
+    DAO-->>-Service: 返回数据
+    Service-->>-Controller: 返回业务结果
+
+%% 响应阶段
+    Controller->>Controller: 构造响应
+    Controller-->>-Logger: 返回响应
+
+    Logger->>Logger: 记录响应日志
+    Logger-->>-Security: 响应通过
+
+    Security-->>-CB: 响应通过
+    CB->>CB: 更新熔断器统计
+    CB-->>-RateLimit: 响应通过
+
+    RateLimit-->>-Auth: 响应通过
+    Auth-->>-Server: 响应通过
+
+    Server-->>-LB: HTTP响应
+    LB-->>-Client: 返回响应
+
+%% 错误处理
+    note over Server,MQ: 任何阶段发生错误都会被<br/>相应的中间件捕获并处理
+
+%% 监控指标
+    note over Logger: 记录Prometheus指标<br/>- 请求计数<br/>- 响应时间<br/>- 错误率

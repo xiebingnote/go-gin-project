@@ -1,0 +1,151 @@
+graph TB
+    subgraph "应用层"
+        App[Go Gin 应用]
+        DAO[数据访问层 DAO]
+    end
+
+    subgraph "连接池管理"
+        ConnPool[连接池管理器]
+        HealthCheck[健康检查]
+        Retry[重试机制]
+    end
+
+    subgraph "关系型数据库"
+        MySQL[(MySQL<br/>主数据库)]
+        PostgreSQL[(PostgreSQL<br/>备用数据库)]
+
+        subgraph "MySQL配置"
+            MySQLConfig[配置参数<br/>- 连接数<br/>- 超时时间<br/>- 字符集]
+        end
+
+        subgraph "PostgreSQL配置"
+            PGConfig[配置参数<br/>- 连接数<br/>- 超时时间<br/>- SSL模式]
+        end
+    end
+
+    subgraph "NoSQL数据库"
+        Redis[(Redis<br/>缓存/会话)]
+        MongoDB[(MongoDB<br/>文档存储)]
+
+        subgraph "Redis配置"
+            RedisConfig[配置参数<br/>- 连接池大小<br/>- 超时设置<br/>- 集群模式]
+        end
+
+        subgraph "MongoDB配置"
+            MongoConfig[配置参数<br/>- 副本集<br/>- 读写分离<br/>- 索引策略]
+        end
+    end
+
+    subgraph "分析数据库"
+        ClickHouse[(ClickHouse<br/>列式分析)]
+        TDengine[(TDengine<br/>时序数据)]
+
+        subgraph "ClickHouse配置"
+            CHConfig[配置参数<br/>- 集群配置<br/>- 压缩算法<br/>- 分片策略]
+        end
+
+        subgraph "TDengine配置"
+            TDConfig[配置参数<br/>- 数据库名<br/>- 时间精度<br/>- 保留策略]
+        end
+    end
+
+    subgraph "搜索引擎"
+        Elasticsearch[(Elasticsearch<br/>全文搜索)]
+        Manticore[(ManticoreSearch<br/>搜索引擎)]
+
+        subgraph "ES配置"
+            ESConfig[配置参数<br/>- 集群节点<br/>- 索引设置<br/>- 分片配置]
+        end
+
+        subgraph "Manticore配置"
+            ManticoreConfig[配置参数<br/>- 索引路径<br/>- 内存限制<br/>- 搜索模式]
+        end
+    end
+
+    subgraph "ORM框架"
+        GORM[GORM ORM<br/>- 自动迁移<br/>- 关联查询<br/>- 事务管理]
+        SQLBuilder[SQL构建器<br/>- 动态查询<br/>- 参数绑定<br/>- 防注入]
+    end
+
+    subgraph "缓存策略"
+        L1Cache[一级缓存<br/>应用内存]
+        L2Cache[二级缓存<br/>Redis]
+        CacheStrategy[缓存策略<br/>- LRU淘汰<br/>- TTL过期<br/>- 预热机制]
+    end
+
+    subgraph "数据同步"
+        Sync[数据同步<br/>- 主从复制<br/>- 读写分离<br/>- 数据一致性]
+        Backup[备份策略<br/>- 定时备份<br/>- 增量备份<br/>- 恢复测试]
+    end
+
+    subgraph "监控告警"
+        DBMonitor[数据库监控<br/>- 连接数<br/>- 查询性能<br/>- 慢查询]
+        Alert[告警机制<br/>- 连接异常<br/>- 性能下降<br/>- 存储空间]
+    end
+
+%% 连接关系
+    App --> DAO
+    DAO --> ConnPool
+    DAO --> GORM
+    DAO --> SQLBuilder
+
+    ConnPool --> HealthCheck
+    ConnPool --> Retry
+
+%% 数据库连接
+    ConnPool --> MySQL
+    ConnPool --> PostgreSQL
+    ConnPool --> Redis
+    ConnPool --> MongoDB
+    ConnPool --> ClickHouse
+    ConnPool --> TDengine
+    ConnPool --> Elasticsearch
+    ConnPool --> Manticore
+
+%% 配置关系
+    MySQL --> MySQLConfig
+    PostgreSQL --> PGConfig
+    Redis --> RedisConfig
+    MongoDB --> MongoConfig
+    ClickHouse --> CHConfig
+    TDengine --> TDConfig
+    Elasticsearch --> ESConfig
+    Manticore --> ManticoreConfig
+
+%% 缓存关系
+    DAO --> L1Cache
+    DAO --> L2Cache
+    L2Cache --> Redis
+    CacheStrategy --> L1Cache
+    CacheStrategy --> L2Cache
+
+%% 同步和备份
+    MySQL --> Sync
+    PostgreSQL --> Sync
+    MongoDB --> Sync
+    MySQL --> Backup
+    PostgreSQL --> Backup
+    MongoDB --> Backup
+
+%% 监控
+    ConnPool --> DBMonitor
+    DBMonitor --> Alert
+
+%% 样式定义
+    classDef appStyle fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    classDef dbStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef nosqlStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef analyticsStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef searchStyle fill:#e0f2f1,stroke:#00695c,stroke-width:2px
+    classDef configStyle fill:#fce4ec,stroke:#c2185b,stroke-width:1px
+    classDef toolStyle fill:#f1f8e9,stroke:#689f38,stroke-width:2px
+    classDef monitorStyle fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+
+    class App,DAO appStyle
+    class MySQL,PostgreSQL dbStyle
+    class Redis,MongoDB nosqlStyle
+    class ClickHouse,TDengine analyticsStyle
+    class Elasticsearch,Manticore searchStyle
+    class MySQLConfig,PGConfig,RedisConfig,MongoConfig,CHConfig,TDConfig,ESConfig,ManticoreConfig configStyle
+    class ConnPool,HealthCheck,Retry,GORM,SQLBuilder,L1Cache,L2Cache,CacheStrategy,Sync,Backup toolStyle
+    class DBMonitor,Alert monitorStyle
