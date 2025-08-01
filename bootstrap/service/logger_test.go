@@ -203,11 +203,8 @@ func TestCreateLogDirectories(t *testing.T) {
 	setupTestLoggerConfig()
 	defer cleanupTestLogDir()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
 	// Test directory creation
-	err := createLogDirectories(ctx)
+	err := CreateDirectories(config.LogConfig.Log.LogDir)
 	if err != nil {
 		t.Errorf("Expected no error creating log directories, got: %v", err)
 	}
@@ -218,7 +215,7 @@ func TestCreateLogDirectories(t *testing.T) {
 	}
 
 	// Test with existing directory
-	err = createLogDirectories(ctx)
+	err = CreateDirectories(config.LogConfig.Log.LogDir)
 	if err != nil {
 		t.Errorf("Expected no error with existing directory, got: %v", err)
 	}
@@ -239,7 +236,7 @@ func TestValidateDirectoryPermissions(t *testing.T) {
 	}
 
 	// Test valid permissions
-	err = validateDirectoryPermissions(testDir)
+	err = ValidateDirectoryPermissions(testDir)
 	if err != nil {
 		t.Errorf("Expected no error with valid permissions, got: %v", err)
 	}
@@ -252,7 +249,7 @@ func TestValidateDirectoryPermissions(t *testing.T) {
 			t.Fatalf("Failed to create read-only directory: %v", err)
 		}
 
-		err = validateDirectoryPermissions(readOnlyDir)
+		err = ValidateDirectoryPermissions(readOnlyDir)
 		if err == nil {
 			t.Errorf("Expected error with read-only directory, got none")
 		}

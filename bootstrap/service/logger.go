@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -59,7 +58,7 @@ func InitLoggerService(ctx context.Context) error {
 	defer cancel()
 
 	// Create and validate log directories
-	if err := createLogDirectories(initCtx); err != nil {
+	if err := CreateDirectories(config.LogConfig.Log.LogDir); err != nil {
 		return fmt.Errorf("failed to create log directories: %w", err)
 	}
 
@@ -145,66 +144,6 @@ func validateLoggerDependencies() error {
 	// Validate version configuration
 	if config.ServerConfig.Version.Version == "" {
 		return fmt.Errorf("application version is not configured")
-	}
-
-	return nil
-}
-
-// createLogDirectories creates and validates log directories.
-//
-// Parameters:
-//   - ctx: Context for the operation
-//
-// Returns:
-//   - error: An error if directory creation fails, nil otherwise
-func createLogDirectories(_ context.Context) error {
-	logDir := config.LogConfig.Log.LogDir
-
-	// Check if directory already exists
-	if info, err := os.Stat(logDir); err == nil {
-		if !info.IsDir() {
-			return fmt.Errorf("log path exists but is not a directory: %s", logDir)
-		}
-		// Directory exists, check permissions
-		return validateDirectoryPermissions(logDir)
-	}
-
-	// Create directory with proper permissions
-	if err := os.MkdirAll(logDir, 0755); err != nil {
-		return fmt.Errorf("failed to create log directory %s: %w", logDir, err)
-	}
-
-	// Validate the created directory
-	if err := validateDirectoryPermissions(logDir); err != nil {
-		return fmt.Errorf("log directory validation failed: %w", err)
-	}
-
-	return nil
-}
-
-// validateDirectoryPermissions validates that the log directory has proper permissions.
-//
-// Parameters:
-//   - dirPath: The directory path to validate
-//
-// Returns:
-//   - error: An error if validation fails, nil otherwise
-func validateDirectoryPermissions(dirPath string) error {
-	// Test write permissions by creating a temporary file
-	testFile := filepath.Join(dirPath, ".write_test")
-	file, err := os.Create(testFile)
-	if err != nil {
-		return fmt.Errorf("log directory is not writable: %s", dirPath)
-	}
-	err = file.Close()
-	if err != nil {
-		return err
-	}
-
-	// Clean up test file
-	if err := os.Remove(testFile); err != nil {
-		// Log warning but don't fail
-		fmt.Printf("Warning: failed to remove test file %s: %v\n", testFile, err)
 	}
 
 	return nil

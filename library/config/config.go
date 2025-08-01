@@ -36,7 +36,10 @@ var (
 
 	// ServerConfig server config entry
 	ServerConfig *ServerConfigEntry
-	
+
+	// StarRocksConfig starrocks config entry
+	StarRocksConfig *StarRocksConfigEntry
+
 	// TDengineConfig TDengine config entry
 	TDengineConfig *TDengineConfigEntry
 

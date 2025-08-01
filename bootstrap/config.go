@@ -96,6 +96,13 @@ func InitConfig(_ context.Context) {
 		panic("Failed to load Redis configuration file: " + err.Error())
 	}
 
+	// Load StarRocks configuration
+	if _, err := toml.DecodeFile("./conf/service/starrocks.toml", &config.StarRocksConfig); err != nil {
+		// The StarRocks configuration file could not be decoded. Panic with the error message.
+		panic("Failed to load StarRocks configuration file: " + err.Error())
+	}
+
+	// Load TDengine configuration
 	if _, err := toml.DecodeFile("./conf/service/tdengine.toml", &config.TDengineConfig); err != nil {
 		// The TDengine configuration file could not be decoded. Panic with the error message.
 		panic("Failed to load TDengine configuration file: " + err.Error())

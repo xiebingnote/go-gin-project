@@ -20,7 +20,7 @@ Name = "Random"
 # 资源定位配置必须有且只有一项
 [Resource.Manual]
 [[Resource.Manual.default]]
-Host = "127.0.0.1"
+Host = "172.20.0.4"
 Port = 3306
 
 # MySQL 配置

@@ -1,10 +1,8 @@
 package controller
 
 import (
-	"github.com/xiebingnote/go-gin-project/servers/httpserver/controller/alarm"
-	"github.com/xiebingnote/go-gin-project/servers/httpserver/controller/test"
-
 	"github.com/gin-gonic/gin"
+	"github.com/xiebingnote/go-gin-project/servers/httpserver/controller/flink"
 )
 
 // Router registers the routes for the controllers.
@@ -13,6 +11,7 @@ import (
 // router.
 func Router(r *gin.RouterGroup) {
 	// Route for the alarm controller.
-	alarm.Router(r.Group("/alarm"))
-	test.Router(r.Group("/test"))
+	//alarm.Router(r.Group("/alarm"))
+	//test.Router(r.Group("/test"))
+	flink.Router(r.Group("/flink"))
 }

@@ -3,7 +3,7 @@
 # HTTPServer 的配置
 [HTTPServer]
 # 监听端口号
-Listen = "0.0.0.0:8080"
+Listen = "0.0.0.0:9080"
 
 # 读 Header + Body 超时时间，ms，可选配置，若不配置，或者为0，将不超时
 # 建议：内网API服务可以小一些；外网页面可大一些，避免弱网访问失败
@@ -69,7 +69,7 @@ EnableSecurity = true
 AuthType = "jwt"
 
 # 是否启用认证
-EnableAuth = true
+EnableAuth = false
 
 # 读取超时时间（秒）
 ReadTimeout = 30
@@ -87,7 +87,7 @@ ShutdownTimeout = 30
 [Options.RateLimit]
 # 是否使用Redis限流
 # 适用于多实例部署的场景
-EnableRedis = true
+EnableRedis = false
 
 # 是否使用内存限流
 # 适用于单实例部署或开发环境

@@ -174,14 +174,6 @@ func startMemoryMonitor() {
 			// Read current memory statistics
 			runtime.ReadMemStats(&m)
 
-			// Log memory statistics
-			resource.LoggerService.Info("Memory stats",
-				zap.Uint64("alloc_mb", m.Alloc/1024/1024), // Allocated memory in MB
-				zap.Uint64("sys_mb", m.Sys/1024/1024),     // Total system memory in MB
-				zap.Uint32("num_gc", m.NumGC),             // Number of completed GC cycles
-				zap.Uint64("heap_objects", m.HeapObjects), // Number of allocated heap objects
-			)
-
 			// Trigger GC if allocated memory exceeds 1GB
 			if m.Alloc > 1024*1024*1024 {
 				runtime.GC()

@@ -1,0 +1,28 @@
+[StarRocks]
+
+# 连接配置
+Endpoints = [
+    "172.20.0.3",
+    #    "127.0.0.1",
+    #    "127.0.0.1",
+]
+# 端口
+HttpPort = 8080
+
+FEPort = 9030
+
+# 用户名
+UserName = "root"
+
+# 密码
+PassWord = ""
+
+Parallelism = 2
+
+FileDir = "./starrocks"
+
+[FlinkCdc]
+# FlinkCdc 配置
+Path = "/opt/flink/lib/flink-cdc-3.4.0"
+
+Cmd = "./bin/flink-cdc.sh"

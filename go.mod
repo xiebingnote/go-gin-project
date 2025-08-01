@@ -35,8 +35,8 @@ require (
 	github.com/prometheus/client_golang v1.11.1
 	github.com/stretchr/testify v1.10.0
 	go.mongodb.org/mongo-driver v1.11.4
-	golang.org/x/time v0.12.0
 	google.golang.org/protobuf v1.36.5
+	gopkg.in/yaml.v2 v2.4.0
 	gorm.io/driver/postgres v1.5.11
 )
 
