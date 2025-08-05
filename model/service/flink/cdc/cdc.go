@@ -199,7 +199,6 @@ func ExecFlinkCDC(fileName string) ([]byte, error) {
 
 	// Construct the full path of the YAML file
 	filePath := fmt.Sprintf("%s/%s.yaml", config.StarRocksConfig.StarRocks.FileDir, fileName)
-	resource.LoggerService.Info(fmt.Sprintf("dir: %s, cmd: %s, filePath: %s", path, cmd, filePath))
 
 	// Execute the command and capture the output
 	return ExecCmd(path, cmd, filePath)

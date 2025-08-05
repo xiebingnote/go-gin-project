@@ -7,8 +7,10 @@ Endpoints = [
     #    "127.0.0.1",
 ]
 # 端口
+# Http 端口
 HttpPort = 8080
 
+# FE 端口
 FEPort = 9030
 
 # 用户名
@@ -17,12 +19,15 @@ UserName = "root"
 # 密码
 PassWord = ""
 
+# 并发数
 Parallelism = 2
 
+# 文件目录
 FileDir = "./starrocks"
 
 [FlinkCdc]
 # FlinkCdc 配置
 Path = "/opt/flink/lib/flink-cdc-3.4.0"
 
+# FlinkCdc 命令
 Cmd = "./bin/flink-cdc.sh"

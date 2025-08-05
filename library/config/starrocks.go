@@ -1,6 +1,6 @@
 package config
 
-// StarRocksConfigEntry
+// StarRocksConfigEntry StarRocks配置
 type StarRocksConfigEntry struct {
 	StarRocks struct {
 		EndPoints   []string `toml:"EndPoints"`   // StarRocks地址

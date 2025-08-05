@@ -3,11 +3,11 @@
 # HTTPServer 的配置
 [HTTPServer]
 # 监听端口号
-Listen = "0.0.0.0:9080"
+Listen = "0.0.0.0:8080"
 
 # 读 Header + Body 超时时间，ms，可选配置，若不配置，或者为0，将不超时
 # 建议：内网API服务可以小一些；外网页面可大一些，避免弱网访问失败
-# 若遇到读取 request.Body 失败，和此参数有关
+# 若遇到读取 request.Body 失败，和此参A数有关
 # 请根据实际情况进行调整
 ReadTimeout = 1 # 1s
 
