@@ -169,25 +169,21 @@ func TestClickHouseConnection(db *sql.DB) error {
 //     SQL DB object.
 //   - nil if the ClickHouse client is nil or the connection is closed successfully.
 func CloseClickHouse() error {
-	// Check if the global ClickHouse client is initialized
-	if resource.ClickHouseClient == nil {
-		// The ClickHouse client is nil, no connection to close
+	return CloseClickHouseContext(context.Background())
+}
+
+// CloseClickHouseContext bounds driver cleanup and retains the handle on failure.
+func CloseClickHouseContext(ctx context.Context) error {
+	client := resource.ClickHouseClient
+	if client == nil {
 		return nil
 	}
-
-	// Attempt to close the ClickHouse connection
-	if err := resource.ClickHouseClient.Close(); err != nil {
-		return fmt.Errorf("failed to close clickhouse connection: %w", err)
+	closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := waitForClose(closeCtx, client.Close); err != nil {
+		return fmt.Errorf("close clickhouse: %w", err)
 	}
-
-	// Reset the global ClickHouse client to nil
 	resource.ClickHouseClient = nil
-
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("🛑 successfully closed clickhouse connection")
-	}
-
-	// Return nil to indicate success
 	return nil
 }
 

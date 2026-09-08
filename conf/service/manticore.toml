@@ -1,10 +1,11 @@
 # Manticore Config
 [Manticore]
-# Manticore endpoints
+# HTTPS endpoint of Manticore or its TLS/authentication reverse proxy.
+# Basic authentication requires HTTPS.
 Endpoints = [
-    "127.0.0.1"
+    "https://127.0.0.1:9308"
 ]
-# Manticore Port
+# Default port for bare host endpoints
 Port = 9308
 # Manticore UserName
 UserName = "root"

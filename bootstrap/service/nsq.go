@@ -8,6 +8,7 @@ import (
 
 	"github.com/xiebingnote/go-gin-project/library/config"
 	"github.com/xiebingnote/go-gin-project/library/resource"
+	"github.com/xiebingnote/go-gin-project/pkg/nsq/handler"
 
 	"github.com/nsqio/go-nsq"
 )
@@ -272,37 +273,17 @@ func InitConsumer(ctx context.Context) error {
 	nsqConfig.WriteTimeout = 10 * time.Second
 	nsqConfig.DialTimeout = 10 * time.Second
 
-	// Create timeout context for consumer initialization
-	consumerCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	// Create a new NSQ consumer with the specified topic, channel, and configuration
-	done := make(chan struct{})
-	var consumer *nsq.Consumer
-	var err error
-
-	go func() {
-		defer close(done)
-		consumer, err = nsq.NewConsumer(cfg.Topic, cfg.Channel, nsqConfig)
-	}()
-
-	// Wait for consumer creation or timeout
-	select {
-	case <-done:
-		if err != nil {
-			resource.LoggerService.Error(fmt.Sprintf("Failed to create NSQ consumer: %v", err))
-			return fmt.Errorf("failed to create NSQ consumer: %w", err)
-		}
-	case <-consumerCtx.Done():
-		resource.LoggerService.Error("NSQ consumer creation timeout")
-		return fmt.Errorf("NSQ consumer creation timeout")
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-
-	// Validate the created consumer
-	if consumer == nil {
-		resource.LoggerService.Error("NSQ consumer is nil after creation")
-		return fmt.Errorf("NSQ consumer is nil after creation")
+	consumer, err := nsq.NewConsumer(cfg.Topic, cfg.Channel, nsqConfig)
+	if err != nil {
+		return fmt.Errorf("create NSQ consumer: %w", err)
 	}
+	// Register before publication: go-nsq needs a handler even for an unconnected
+	// consumer to complete StopChan. The same handler is used when connecting.
+	nsqMessageHandler = &drainingNSQHandler{handler: nsq.HandlerFunc(handler.HandleMessage)}
+	consumer.AddHandler(nsqMessageHandler)
 
 	// Store the consumer in global resource
 	resource.NsqConsumer = consumer
@@ -326,97 +307,71 @@ func InitConsumer(ctx context.Context) error {
 // 2. Stops the NSQ consumer gracefully with timeout
 // 3. Clears all global resource references
 func CloseNsq(ctx context.Context) error {
-	var errs []error
-
-	// Create timeout context for shutdown operations
 	shutdownCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-
-	// Stop all the producers concurrently
-	if len(resource.NsqProducer) > 0 {
-		resource.LoggerService.Info(fmt.Sprintf("Stopping %d NSQ producers", len(resource.NsqProducer)))
-
-		var wg sync.WaitGroup
-		errChan := make(chan error, len(resource.NsqProducer))
-
-		for i, producer := range resource.NsqProducer {
-			if producer == nil {
-				continue
+	if consumer := resource.NsqConsumer; consumer != nil {
+		if err := stopNSQConsumer(shutdownCtx, consumer.Stop, consumer.StopChan); err != nil {
+			return fmt.Errorf("drain NSQ consumer: %w", err)
+		}
+		// go-nsq may force StopChan closed after 30s. Also wait for our application
+		// handler, and prevent new work from beginning after that forced stop.
+		if nsqMessageHandler != nil {
+			if err := nsqMessageHandler.drain(shutdownCtx); err != nil {
+				return fmt.Errorf("drain NSQ handler: %w", err)
 			}
-
-			wg.Add(1)
-			go func(index int, p *nsq.Producer) {
-				defer wg.Done()
-
-				done := make(chan struct{})
-				go func() {
-					defer close(done)
-					p.Stop()
-				}()
-
-				select {
-				case <-done:
-					resource.LoggerService.Info(fmt.Sprintf("Successfully stopped NSQ producer %d", index))
-				case <-shutdownCtx.Done():
-					resource.LoggerService.Error(fmt.Sprintf("Timeout stopping NSQ producer %d", index))
-					errChan <- fmt.Errorf("timeout stopping NSQ producer %d", index)
-				}
-			}(i, producer)
 		}
-
-		// Wait for all producers to stop
-		wg.Wait()
-		close(errChan)
-
-		// Collect any errors
-		for err := range errChan {
-			errs = append(errs, err)
-		}
-
-		// Clear the producers slice
-		resource.NsqProducer = nil
-		resource.LoggerService.Info("All NSQ producers stopped")
-	}
-
-	// Stop the consumer
-	if resource.NsqConsumer != nil {
-		resource.LoggerService.Info("Stopping NSQ consumer")
-
-		done := make(chan struct{})
-		go func() {
-			defer close(done)
-			resource.NsqConsumer.Stop()
-		}()
-
-		select {
-		case <-done:
-			resource.LoggerService.Info("Successfully stopped NSQ consumer")
-		case <-shutdownCtx.Done():
-			resource.LoggerService.Error("Timeout stopping NSQ consumer")
-			errs = append(errs, fmt.Errorf("timeout stopping NSQ consumer"))
-		}
-
-		// Clear the consumer reference
 		resource.NsqConsumer = nil
+		nsqMessageHandler = nil
 	}
-
-	// Return combined errors if any
-	if len(errs) > 0 {
-		var combinedErr error
-		for _, err := range errs {
-			if combinedErr == nil {
-				combinedErr = err
-			} else {
-				combinedErr = fmt.Errorf("%v; %w", combinedErr, err)
-			}
+	for i, producer := range resource.NsqProducer {
+		if producer == nil {
+			continue
 		}
-		resource.LoggerService.Error(fmt.Sprintf("NSQ shutdown completed with errors: %v", combinedErr))
-		return combinedErr
+		if err := waitForClose(shutdownCtx, func() error { producer.Stop(); return nil }); err != nil {
+			return fmt.Errorf("stop NSQ producer %d: %w", i, err)
+		}
+		resource.NsqProducer[i] = nil
 	}
-
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("🛑 NSQ client shutdown completed successfully")
-	}
-
+	resource.NsqProducer = nil
 	return nil
+}
+
+func stopNSQConsumer(ctx context.Context, stop func(), stopped <-chan int) error {
+	if err := waitForClose(ctx, func() error { stop(); return nil }); err != nil {
+		return err
+	}
+	select {
+	case <-stopped:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+var nsqMessageHandler *drainingNSQHandler
+
+type drainingNSQHandler struct {
+	handler  nsq.Handler
+	mu       sync.Mutex
+	stopping bool
+	active   sync.WaitGroup
+}
+
+func (h *drainingNSQHandler) HandleMessage(message *nsq.Message) error {
+	h.mu.Lock()
+	if h.stopping {
+		h.mu.Unlock()
+		return fmt.Errorf("NSQ consumer is stopping")
+	}
+	h.active.Add(1)
+	h.mu.Unlock()
+	defer h.active.Done()
+	return h.handler.HandleMessage(message)
+}
+
+func (h *drainingNSQHandler) drain(ctx context.Context) error {
+	h.mu.Lock()
+	h.stopping = true
+	h.mu.Unlock()
+	return waitForClose(ctx, func() error { h.active.Wait(); return nil })
 }

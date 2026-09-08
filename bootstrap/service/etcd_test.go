@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -95,7 +96,7 @@ func TestValidateEtcdConfig(t *testing.T) {
 				return cfg
 			}(),
 			expectError: true,
-			errorMsg:    "etcd username is empty",
+			errorMsg:    "etcd password provided but username is empty",
 		},
 		{
 			name: "empty password",
@@ -105,7 +106,7 @@ func TestValidateEtcdConfig(t *testing.T) {
 				return cfg
 			}(),
 			expectError: true,
-			errorMsg:    "etcd password is empty",
+			errorMsg:    "etcd username provided but password is empty",
 		},
 		{
 			name: "invalid dial timeout",
@@ -254,8 +255,8 @@ func TestConfigureEtcdClient(t *testing.T) {
 	}
 
 	// Verify additional settings
-	if clientConfig.AutoSyncInterval != 30*time.Second {
-		t.Errorf("Expected AutoSyncInterval to be 30s, got %v", clientConfig.AutoSyncInterval)
+	if clientConfig.AutoSyncInterval != 0 {
+		t.Errorf("Expected AutoSyncInterval to remain disabled, got %v", clientConfig.AutoSyncInterval)
 	}
 
 	if !clientConfig.RejectOldCluster {
@@ -355,7 +356,7 @@ func TestInitEtcdClient_ConfigValidation(t *testing.T) {
 
 	// Verify error message contains validation failure
 	expectedSubstring := "invalid etcd configuration"
-	if err != nil && !contains(err.Error(), expectedSubstring) {
+	if err != nil && !strings.Contains(err.Error(), expectedSubstring) {
 		t.Errorf("Expected error to contain '%s', got: %v", expectedSubstring, err)
 	}
 }

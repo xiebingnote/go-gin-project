@@ -2,8 +2,9 @@
 # TDengine server configuration
 # TDengine server host
 Host = "127.0.0.1"
-# TDengine server port
-Port = 6030
+# taosAdapter WebSocket endpoint (not the native port 6030)
+Protocol = "ws"
+Port = 6041
 # TDengine username
 UserName = "root"
 # TDengine password
@@ -11,13 +12,13 @@ PassWord = "taosdata"
 # TDengine database name
 Database = "test"
 
-# Connection configuration (in milliseconds)
+# Connection configuration (Go duration strings)
 # Connection timeout
-ConnectTimeout = 10000
+ConnectTimeout = "10s"
 # Read timeout
-ReadTimeout = 30000
+ReadTimeout = "30s"
 # Write timeout
-WriteTimeout = 30000
+WriteTimeout = "30s"
 
 # Connection pool configuration
 # Maximum number of open connections (0 = unlimited)
@@ -25,6 +26,6 @@ MaxOpenConns = 10
 # Maximum number of idle connections
 MaxIdleConns = 5
 # Maximum connection lifetime (0 = no limit)
-ConnMaxLifetime = 3600000
+ConnMaxLifetime = "1h"
 # Maximum connection idle time (0 = no limit)
-ConnMaxIdleTime = 300000
+ConnMaxIdleTime = "5m"

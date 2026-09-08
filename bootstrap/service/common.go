@@ -2,11 +2,11 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/xiebingnote/go-gin-project/library/config"
 	"os"
-	"path/filepath"
 
+	"github.com/xiebingnote/go-gin-project/library/config"
 	"github.com/xiebingnote/go-gin-project/library/resource"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -77,21 +77,9 @@ func CreateDirectories(dir string) error {
 //   - error: An error if validation fails, nil otherwise
 func ValidateDirectoryPermissions(dirPath string) error {
 	// Test write permissions by creating a temporary file
-	testFile := filepath.Join(dirPath, ".write_test")
-	file, err := os.Create(testFile)
+	file, err := os.CreateTemp(dirPath, ".write_test-*")
 	if err != nil {
-		return fmt.Errorf("flile directory is not writable: %s", dirPath)
+		return fmt.Errorf("directory %s is not writable: %w", dirPath, err)
 	}
-	err = file.Close()
-	if err != nil {
-		return err
-	}
-
-	// Clean up test file
-	if err := os.Remove(testFile); err != nil {
-		// Log warning but don't fail
-		fmt.Printf("Warning: failed to remove test file %s: %v\n", testFile, err)
-	}
-
-	return nil
+	return errors.Join(file.Close(), os.Remove(file.Name()))
 }

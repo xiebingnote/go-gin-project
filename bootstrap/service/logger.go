@@ -232,45 +232,22 @@ func createLoggerInstance(ctx context.Context) (*zap.Logger, error) {
 // 2. Flushes any pending log entries
 // 3. Clears the global resource reference
 func CloseLogger(ctx context.Context) error {
-	if resource.LoggerService == nil {
-		// Use standard log for this message since logger is not available
-		log.Println("logger service is not initialized, nothing to close")
+	logger := resource.LoggerService
+	if logger == nil {
 		return nil
 	}
-
-	// Create timeout context for close operation
 	closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-
-	// Flush pending log entries
-	done := make(chan error, 1)
-	go func() {
-		defer close(done)
-
-		// Sync the logger to flush any pending entries
-		if err := resource.LoggerService.Sync(); err != nil {
-			// Check if this is a common sync error that can be safely ignored
-			if !isSyncErrorIgnorable(err) {
-				log.Printf("Warning: logger sync failed during close: %v", err)
-			}
+	err := waitForClose(closeCtx, func() error {
+		if err := logger.Sync(); err != nil && !isSyncErrorIgnorable(err) {
+			return err
 		}
-
-		done <- nil
-	}()
-
-	// Wait for sync operation or timeout
-	select {
-	case err := <-done:
-		if err != nil {
-			return fmt.Errorf("failed to close logger service: %w", err)
-		}
-	case <-closeCtx.Done():
-		fmt.Println("Warning: logger close timeout, proceeding anyway")
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("flush logger during shutdown: %w", err)
 	}
-
-	// Clear the global reference
 	resource.LoggerService = nil
-
 	return nil
 }
 

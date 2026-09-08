@@ -226,52 +226,19 @@ func createCasbinEnforcer(ctx context.Context, adapter *gormadapter.Adapter) (*c
 //
 // Returns:
 //   - error: An error if validation fails, nil otherwise
-func validateCasbinEnforcer(_ context.Context, enforcer *casbin.Enforcer) error {
-	resource.LoggerService.Info("validating casbin enforcer functionality")
-
-	// Test basic enforcement functionality
-	testSubject := "test_user"
-	testObject := "/test/resource"
-	testAction := "GET"
-
-	// Test enforcement (should return false for non-existent policy)
-	allowed, err := enforcer.Enforce(testSubject, testObject, testAction)
+func validateCasbinEnforcer(ctx context.Context, enforcer *casbin.Enforcer) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if enforcer == nil {
+		return fmt.Errorf("casbin enforcer is nil")
+	}
+	// Exercise the loaded model without modifying either memory or persistence.
+	// An existing rule may legitimately allow this request.
+	_, err := enforcer.Enforce("test_user", "/test/resource", "GET")
 	if err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("casbin enforce test failed: %v", err))
-		return fmt.Errorf("enforce test failed: %w", err)
+		return fmt.Errorf("enforce validation failed: %w", err)
 	}
-
-	// Log the test result (expected to be false for non-existent policy)
-	resource.LoggerService.Info(fmt.Sprintf("casbin enforce test result: %v (expected: false)", allowed))
-
-	// Test policy addition and removal
-	testPolicy := []string{testSubject, testObject, testAction}
-
-	// Add test policy
-	if _, err := enforcer.AddPolicy(testPolicy); err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("failed to add test policy: %v", err))
-		return fmt.Errorf("failed to add test policy: %w", err)
-	}
-
-	// Test enforcement with the new policy (should return true)
-	allowed, err = enforcer.Enforce(testSubject, testObject, testAction)
-	if err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("casbin enforce test with policy failed: %v", err))
-		return fmt.Errorf("enforce test with policy failed: %w", err)
-	}
-
-	if !allowed {
-		resource.LoggerService.Error("casbin enforce test should return true with policy")
-		return fmt.Errorf("enforce test should return true with policy")
-	}
-
-	// Remove test policy
-	if _, err := enforcer.RemovePolicy(testPolicy); err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("failed to remove test policy: %v", err))
-		return fmt.Errorf("failed to remove test policy: %w", err)
-	}
-
-	resource.LoggerService.Info("casbin enforcer validation completed successfully")
 	return nil
 }
 
@@ -285,50 +252,11 @@ func validateCasbinEnforcer(_ context.Context, enforcer *casbin.Enforcer) error 
 //
 // The function performs the following operations:
 // 1. Checks if the enforcer is initialized
-// 2. Saves any pending policy changes
+// 2. Leaves persisted policies untouched (mutations use AutoSave)
 // 3. Clears the global resource reference
-func CloseCasbin(ctx context.Context) error {
-	if resource.Enforcer == nil {
-		return nil
-	}
-
-	// Create timeout context for close operation
-	closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	// Save any pending policy changes
-	done := make(chan error, 1)
-	go func() {
-		defer close(done)
-		if err := resource.Enforcer.SavePolicy(); err != nil {
-			done <- fmt.Errorf("failed to save casbin policy: %w", err)
-			return
-		}
-		done <- nil
-	}()
-
-	// Wait for save operation or timeout
-	select {
-	case err := <-done:
-		if err != nil {
-			if resource.LoggerService != nil {
-				resource.LoggerService.Error(fmt.Sprintf("failed to save casbin policy during close: %v", err))
-			}
-			return err
-		}
-	case <-closeCtx.Done():
-		if resource.LoggerService != nil {
-			resource.LoggerService.Error("casbin policy save timeout during close")
-		}
-		return fmt.Errorf("casbin policy save timeout")
-	}
-
-	// Clear the global enforcer reference
+func CloseCasbin(_ context.Context) error {
+	// AutoSave persists each explicit mutation. Saving this replica's full snapshot
+	// here could overwrite policy changes made by another replica.
 	resource.Enforcer = nil
-
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("🛑 successfully closed casbin enforcer")
-	}
-
 	return nil
 }

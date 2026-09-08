@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -253,10 +254,12 @@ func TestConfigureKafkaProducer(t *testing.T) {
 		t.Errorf("Expected Net.DialTimeout to be 30s, got %v", producerConfig.Net.DialTimeout)
 	}
 
-	// Note: MaxOpenRequests is set to 1 for idempotency but then overridden by configureNetworkSettings
-	// This is expected behavior based on the current implementation
-	if producerConfig.Net.MaxOpenRequests != 5 {
-		t.Errorf("Expected Net.MaxOpenRequests to be 5 (from configureNetworkSettings), got %d", producerConfig.Net.MaxOpenRequests)
+	// Sarama requires at most one in-flight request for an idempotent producer.
+	if producerConfig.Net.MaxOpenRequests != 1 {
+		t.Errorf("Expected Net.MaxOpenRequests to be 1 for idempotency, got %d", producerConfig.Net.MaxOpenRequests)
+	}
+	if err := producerConfig.Validate(); err != nil {
+		t.Fatalf("invalid idempotent producer configuration: %v", err)
 	}
 }
 
@@ -427,7 +430,7 @@ func TestPerformHealthCheck_NoClients(t *testing.T) {
 	}
 
 	expectedSubstring := "kafka producer is not initialized"
-	if !contains(err.Error(), expectedSubstring) {
+	if !strings.Contains(err.Error(), expectedSubstring) {
 		t.Errorf("Expected error to contain '%s', got: %v", expectedSubstring, err)
 	}
 }

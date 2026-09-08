@@ -3,13 +3,18 @@ package service
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
+	"net"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
+
+	"github.com/taosdata/driver-go/v3/taosWS"
 
 	"github.com/xiebingnote/go-gin-project/library/config"
 	"github.com/xiebingnote/go-gin-project/library/resource"
-	// TDengine driver - uncomment when TDengine is available
-	//_ "github.com/taosdata/driver-go/v3/taosSql"
 )
 
 // InitTDengine initializes the TDengine database connection.
@@ -90,6 +95,12 @@ func validateTDengineDependencies() error {
 	}
 
 	cfg := &config.TDengineConfig.TDengine
+	if cfg.Protocol != "" && cfg.Protocol != "ws" && cfg.Protocol != "wss" {
+		return fmt.Errorf("tdengine protocol must be ws or wss")
+	}
+	if strings.ContainsAny(cfg.Database, "/?\\") {
+		return fmt.Errorf("tdengine database contains DSN delimiters")
+	}
 
 	// Validate required fields
 	if cfg.Host == "" {
@@ -155,47 +166,60 @@ func validateTDengineDependencies() error {
 //   - *sql.DB: The created database connection
 //   - error: An error if client creation fails, nil otherwise
 func createTDengineClient(ctx context.Context) (*sql.DB, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	cfg := &config.TDengineConfig.TDengine
-
-	resource.LoggerService.Info(fmt.Sprintf("creating tdengine client for %s:%d/%s", cfg.Host, cfg.Port, cfg.Database))
-
-	// Create the DSN (Data Source Name) for the TDengine client
-	dsn := buildTDengineDSN(config.TDengineConfig)
-	resource.LoggerService.Info(fmt.Sprintf("tdengine dsn: %s", maskPassword(dsn)))
-
-	// Open a connection to the TDengine database using the DSN
-	done := make(chan struct{})
-	var db *sql.DB
-	var err error
-
-	go func() {
-		defer close(done)
-		db, err = sql.Open("taosSql", dsn)
-	}()
-
-	// Wait for connection creation or timeout
-	select {
-	case <-done:
-		if err != nil {
-			resource.LoggerService.Error(fmt.Sprintf("failed to open tdengine connection: %v", err))
-			return nil, fmt.Errorf("failed to open tdengine connection: %w", err)
-		}
-	case <-ctx.Done():
-		resource.LoggerService.Error("tdengine connection creation timeout")
-		return nil, fmt.Errorf("connection creation timeout")
+	connector, err := (taosWS.TDengineDriver{}).OpenConnector(buildTDengineDSN(config.TDengineConfig))
+	if err != nil {
+		return nil, fmt.Errorf("configure tdengine connector: %w", err)
 	}
-
-	// Configure connection pool settings
+	timeout := cfg.ConnectTimeout
+	if timeout == 0 {
+		timeout = 10 * time.Second
+	}
+	db := sql.OpenDB(&tdengineConnector{Connector: connector, timeout: timeout})
 	if err := configureTDenginePool(db, config.TDengineConfig); err != nil {
-		err := db.Close()
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("failed to configure connection pool: %w", err)
+		_ = db.Close()
+		return nil, fmt.Errorf("configure tdengine pool: %w", err)
 	}
-
-	resource.LoggerService.Info("successfully created tdengine client")
 	return db, nil
+}
+
+// The upstream websocket connector does not honor Connect's context. Bound the
+// wait here and close a late connection instead of leaking it on cancellation.
+type tdengineConnector struct {
+	driver.Connector
+	timeout time.Duration
+}
+
+func (c *tdengineConnector) Connect(ctx context.Context) (driver.Conn, error) {
+	connectCtx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	if err := connectCtx.Err(); err != nil {
+		return nil, err
+	}
+	type result struct {
+		conn driver.Conn
+		err  error
+	}
+	done := make(chan result)
+	go func() {
+		conn, err := c.Connector.Connect(connectCtx)
+		select {
+		case done <- result{conn, err}:
+		case <-connectCtx.Done():
+			if conn != nil {
+				_ = conn.Close()
+			}
+		}
+	}()
+	select {
+	case result := <-done:
+		return result.conn, result.err
+	case <-connectCtx.Done():
+		return nil, connectCtx.Err()
+	}
 }
 
 // buildTDengineDSN builds the Data Source Name for TDengine connection.
@@ -206,63 +230,22 @@ func createTDengineClient(ctx context.Context) (*sql.DB, error) {
 // Returns:
 //   - string: The DSN string
 func buildTDengineDSN(cfg *config.TDengineConfigEntry) string {
-	// Basic DSN format: username:password@tcp(host:port)/database
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
-		cfg.TDengine.UserName,
-		cfg.TDengine.PassWord,
-		cfg.TDengine.Host,
-		cfg.TDengine.Port,
-		cfg.TDengine.Database)
-
-	// Add timeout parameters if configured
-	params := make([]string, 0)
-
-	if cfg.TDengine.ConnectTimeout > 0 {
-		params = append(params, fmt.Sprintf("timeout=%dms", cfg.TDengine.ConnectTimeout/time.Millisecond))
+	td := &cfg.TDengine
+	protocol := td.Protocol
+	if protocol == "" {
+		protocol = "ws"
 	}
-
-	if cfg.TDengine.ReadTimeout > 0 {
-		params = append(params, fmt.Sprintf("readTimeout=%dms", cfg.TDengine.ReadTimeout/time.Millisecond))
+	dsn := fmt.Sprintf("%s:%s@%s(%s)/%s", url.QueryEscape(td.UserName), url.QueryEscape(td.PassWord),
+		protocol, net.JoinHostPort(td.Host, strconv.FormatInt(td.Port, 10)), td.Database)
+	params := url.Values{}
+	if td.ReadTimeout > 0 {
+		params.Set("readTimeout", td.ReadTimeout.String())
 	}
-
-	if cfg.TDengine.WriteTimeout > 0 {
-		params = append(params, fmt.Sprintf("writeTimeout=%dms", cfg.TDengine.WriteTimeout/time.Millisecond))
+	if td.WriteTimeout > 0 {
+		params.Set("writeTimeout", td.WriteTimeout.String())
 	}
-
 	if len(params) > 0 {
-		dsn += "?" + joinParams(params)
-	}
-
-	return dsn
-}
-
-// joinParams joins parameter strings with "&".
-func joinParams(params []string) string {
-	if len(params) == 0 {
-		return ""
-	}
-
-	result := params[0]
-	for i := 1; i < len(params); i++ {
-		result += "&" + params[i]
-	}
-	return result
-}
-
-// maskPassword masks the password in DSN for logging.
-func maskPassword(dsn string) string {
-	// Simple password masking for logging
-	// Find the pattern username:password@
-	for i := 0; i < len(dsn); i++ {
-		if dsn[i] == ':' {
-			// Found username:, now find the @ after password
-			for j := i + 1; j < len(dsn); j++ {
-				if dsn[j] == '@' {
-					// Replace password with ***
-					return dsn[:i+1] + "***" + dsn[j:]
-				}
-			}
-		}
+		dsn += "?" + params.Encode()
 	}
 	return dsn
 }
@@ -371,7 +354,6 @@ func testTDengineQuery(ctx context.Context, db *sql.DB) error {
 			return
 		}
 
-		resource.LoggerService.Info(fmt.Sprintf("tdengine server version: %s", version))
 		done <- nil
 	}()
 
@@ -403,48 +385,15 @@ func testTDengineQuery(ctx context.Context, db *sql.DB) error {
 // 2. Performs any necessary cleanup operations
 // 3. Clears the global resource reference
 func CloseTDengine(ctx context.Context) error {
-	if resource.TDengineClient == nil {
+	client := resource.TDengineClient
+	if client == nil {
 		return nil
 	}
-
-	resource.LoggerService.Info("closing tdengine client")
-
-	// Create timeout context for close operation
 	closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-
-	// Perform cleanup operations
-	done := make(chan error, 1)
-	go func() {
-		defer close(done)
-
-		// Close the database connection
-		if err := resource.TDengineClient.Close(); err != nil {
-			done <- fmt.Errorf("failed to close tdengine connection: %w", err)
-			return
-		}
-
-		done <- nil
-	}()
-
-	// Wait for close operation or timeout
-	select {
-	case err := <-done:
-		if err != nil {
-			resource.LoggerService.Error(fmt.Sprintf("failed to close tdengine client: %v", err))
-			return err
-		}
-	case <-closeCtx.Done():
-		resource.LoggerService.Error("tdengine client close timeout")
-		return fmt.Errorf("tdengine client close timeout")
+	if err := waitForClose(closeCtx, client.Close); err != nil {
+		return fmt.Errorf("close tdengine: %w", err)
 	}
-
-	// Clear the global reference
 	resource.TDengineClient = nil
-
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("🛑 successfully closed tdengine client")
-	}
-
 	return nil
 }

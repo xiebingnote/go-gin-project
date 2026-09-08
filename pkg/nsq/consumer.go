@@ -3,10 +3,9 @@ package nsq
 import (
 	"fmt"
 
-	"github.com/xiebingnote/go-gin-project/library/common"
 	"github.com/xiebingnote/go-gin-project/library/config"
 	"github.com/xiebingnote/go-gin-project/library/resource"
-	pkgproto "github.com/xiebingnote/go-gin-project/pkg/proto"
+	"github.com/xiebingnote/go-gin-project/pkg/nsq/handler"
 
 	"github.com/nsqio/go-nsq"
 )
@@ -20,8 +19,7 @@ import (
 // Returns:
 //   - An error if connecting to NSQLookupd addresses fails.
 func Consumer() error {
-	// Add a message handler to the NSQ consumer.
-	resource.NsqConsumer.AddHandler(nsq.HandlerFunc(MessageHandler))
+	// The bootstrap initializer registers the message handler before publication.
 
 	// Connect the consumer to the NSQLookupd addresses.
 	if err := resource.NsqConsumer.ConnectToNSQLookupds(config.NsqConfig.NSQ.LookupdAddress); err != nil {
@@ -44,15 +42,5 @@ func Consumer() error {
 // Returns:
 //   - An error if deserialization fails.
 func MessageHandler(message *nsq.Message) error {
-	// Deserialize the message body into a TestMessage structure
-	data, err := common.DeSerializeData(message.Body, &pkgproto.TestMessage{})
-	if err != nil {
-		// Return an error if deserialization fails
-		return err
-	}
-
-	// Additional processing logic
-	fmt.Println("data:", data)
-
-	return nil
+	return handler.HandleMessage(message)
 }

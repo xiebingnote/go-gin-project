@@ -187,26 +187,21 @@ func TestEtcdConnection(client *clientv3.Client, cfg *config.EtcdConfigEntry) er
 //   - An error if there is an issue closing the connection
 //   - nil if the Etcd client is nil or the connection is closed successfully
 func CloseEtcd() error {
-	// Check if the global Etcd client is initialized
-	if resource.EtcdClient == nil {
-		// The Etcd client is nil, no connection to close
+	return CloseEtcdContext(context.Background())
+}
+
+// CloseEtcdContext bounds driver cleanup and retains the handle on failure.
+func CloseEtcdContext(ctx context.Context) error {
+	client := resource.EtcdClient
+	if client == nil {
 		return nil
 	}
-
-	// Attempt to close the Etcd connection
-	if err := resource.EtcdClient.Close(); err != nil {
-		if resource.LoggerService != nil {
-			resource.LoggerService.Error(fmt.Sprintf("failed to close etcd connection: %v", err))
-		}
-		return err
+	closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := waitForClose(closeCtx, client.Close); err != nil {
+		return fmt.Errorf("close etcd: %w", err)
 	}
-
-	// Reset the global Etcd client to nil
 	resource.EtcdClient = nil
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("🛑 successfully closed etcd connection")
-	}
-
 	return nil
 }
 

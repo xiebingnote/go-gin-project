@@ -236,36 +236,25 @@ func newGormLogger(cfg *config.MySQLConfigEntry) logger.Interface {
 //     SQL DB object.
 //   - nil if the MySQL client is nil or the connection is closed successfully.
 func CloseMySQL() error {
-	// Check if the global MySQL client is initialized.
-	if resource.MySQLClient == nil {
-		// The MySQL client is nil, no connection to close.
+	return CloseMySQLContext(context.Background())
+}
+
+// CloseMySQLContext bounds driver cleanup and retains the handle on failure.
+func CloseMySQLContext(ctx context.Context) error {
+	client := resource.MySQLClient
+	if client == nil {
 		return nil
 	}
-
-	// Attempt to retrieve the underlying SQL DB object from the global MySQL client.
-	// This is the same as calling resource.MySQLClient.DB()
-	sqlDB, err := resource.MySQLClient.DB()
+	closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	sqlDB, err := client.DB()
 	if err != nil {
-		// Return an error if there is an issue getting the SQL DB object,
-		// This should not happen unless the resource has been tampered with
-		return fmt.Errorf("failed to get sql.DB: %w", err)
+		return fmt.Errorf("get sql.DB: %w", err)
 	}
-
-	// Attempt to close the MySQL connection.
-	if err := sqlDB.Close(); err != nil {
-		// Return an error if closing the connection fails,
-		// This could happen if the connection is already closed
-		return fmt.Errorf("failed to close MySQL connection: %w", err)
+	if err := waitForClose(closeCtx, sqlDB.Close); err != nil {
+		return fmt.Errorf("close mysql: %w", err)
 	}
-
-	// Reset the global MySQL client to nil.
 	resource.MySQLClient = nil
-
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("🛑 successfully closed MySQL connection")
-	}
-
-	// Return nil to indicate success.
 	return nil
 }
 

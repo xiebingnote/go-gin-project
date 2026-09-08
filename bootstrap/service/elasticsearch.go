@@ -206,23 +206,21 @@ func TestElasticSearchConnection(client *elastic.Client) error {
 //   - An error if there is an issue closing the connection
 //   - nil if the Elasticsearch client is nil or the connection is closed successfully
 func CloseElasticSearch() error {
-	// Check if the global Elasticsearch client is initialized
-	if resource.ElasticSearchClient == nil {
-		// The Elasticsearch client is nil, no connection to close
+	return CloseElasticSearchContext(context.Background())
+}
+
+// CloseElasticSearchContext bounds driver cleanup and retains the handle on failure.
+func CloseElasticSearchContext(ctx context.Context) error {
+	client := resource.ElasticSearchClient
+	if client == nil {
 		return nil
 	}
-
-	// Attempt to close the Elasticsearch connection
-	resource.ElasticSearchClient.Stop()
-
-	// Reset the global Elasticsearch client to nil
-	resource.ElasticSearchClient = nil
-
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("🛑 successfully closed Elasticsearch connection")
+	closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := waitForClose(closeCtx, func() error { client.Stop(); return nil }); err != nil {
+		return fmt.Errorf("close elasticsearch: %w", err)
 	}
-
-	// Return nil to indicate success
+	resource.ElasticSearchClient = nil
 	return nil
 }
 

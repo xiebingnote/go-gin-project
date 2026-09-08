@@ -87,7 +87,7 @@ func InitRedisClient(ctx context.Context) error {
 
 	// Start health check if configured
 	if cfg.HealthCheckFreq > 0 {
-		go startRedisHealthCheck(ctx, cfg.HealthCheckFreq)
+		redisHealthWorker.start(ctx, func(workerCtx context.Context) { startRedisHealthCheck(workerCtx, cfg.HealthCheckFreq) })
 	}
 
 	resource.LoggerService.Info(fmt.Sprintf("✅ successfully initialized redis client for address: %s, DB: %d",
@@ -105,59 +105,12 @@ func InitRedisClient(ctx context.Context) error {
 // Returns:
 //   - error: An error if any test fails, nil otherwise
 func testRedisConnection(ctx context.Context, client *redis.Client) error {
-	// Create timeout context for connection tests
 	testCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-
-	resource.LoggerService.Info("testing redis connection")
-
-	// Test 1: Basic ping
-	if _, err := client.Ping(testCtx).Result(); err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("redis ping test failed: %v", err))
-		return fmt.Errorf("ping test failed: %w", err)
+	// A health check must not overwrite application keys or require write access.
+	if err := client.Ping(testCtx).Err(); err != nil {
+		return fmt.Errorf("redis ping failed: %w", err)
 	}
-
-	// Test 2: Get server info
-	info, err := client.Info(testCtx).Result()
-	if err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("redis info command failed: %v", err))
-		return fmt.Errorf("info command failed: %w", err)
-	}
-
-	// Log server information
-	resource.LoggerService.Info("redis server info retrieved successfully")
-
-	// Test 3: Basic set/get operation
-	testKey := "redis:health:test"
-	testValue := "test_value"
-
-	if err := client.Set(testCtx, testKey, testValue, time.Minute).Err(); err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("redis set test failed: %v", err))
-		return fmt.Errorf("set test failed: %w", err)
-	}
-
-	val, err := client.Get(testCtx, testKey).Result()
-	if err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("redis get test failed: %v", err))
-		return fmt.Errorf("get test failed: %w", err)
-	}
-
-	if val != testValue {
-		resource.LoggerService.Error(fmt.Sprintf("redis value mismatch: expected %s, got %s", testValue, val))
-		return fmt.Errorf("value mismatch: expected %s, got %s", testValue, val)
-	}
-
-	// Clean up test key
-	if err := client.Del(testCtx, testKey).Err(); err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("failed to clean up test key: %v", err))
-		// Don't return error for cleanup failure
-	}
-
-	// Parse and log useful server information
-	if len(info) > 0 {
-		resource.LoggerService.Info("redis connection test completed successfully")
-	}
-
 	return nil
 }
 
@@ -286,47 +239,18 @@ func validateRedisConfig(cfg *config.RedisConfigEntry) error {
 // 2. Attempts to close the connection with timeout
 // 3. Clears the global resource reference
 func CloseRedis(ctx context.Context) error {
-	if resource.RedisClient == nil {
-		return nil
-	}
-
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("closing redis client connection")
-	}
-
-	// Create timeout context for close operation
 	closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-
-	// Attempt to perform a final ping to check connection status
-	done := make(chan error, 1)
-	go func() {
-		defer close(done)
-		done <- resource.RedisClient.Close()
-	}()
-
-	// Wait for close operation or timeout
-	select {
-	case err := <-done:
-		if err != nil {
-			if resource.LoggerService != nil {
-				resource.LoggerService.Error(fmt.Sprintf("failed to close redis connection: %v", err))
-			}
-			return fmt.Errorf("failed to close redis connection: %w", err)
-		}
-	case <-closeCtx.Done():
-		if resource.LoggerService != nil {
-			resource.LoggerService.Error("redis close operation timeout")
-		}
-		return fmt.Errorf("redis close operation timeout")
+	if err := redisHealthWorker.stop(closeCtx); err != nil {
+		return err
 	}
-
-	// Clear the global Redis client reference
+	client := resource.RedisClient
+	if client == nil {
+		return nil
+	}
+	if err := waitForClose(closeCtx, client.Close); err != nil {
+		return fmt.Errorf("close redis: %w", err)
+	}
 	resource.RedisClient = nil
-
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("🛑 successfully closed redis client connection")
-	}
-
 	return nil
 }

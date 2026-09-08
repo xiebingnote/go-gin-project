@@ -234,7 +234,7 @@ func TestBuildPostgresqlDSN(t *testing.T) {
 		{
 			name:     "basic dsn",
 			config:   setupTestPostgresqlConfig(),
-			expected: "host=localhost port=5432 user=postgres password=password dbname=testdb sslmode=disable",
+			expected: "host='localhost' port=5432 user='postgres' password='password' dbname='testdb' sslmode='disable'",
 		},
 		{
 			name: "dsn with ssl",
@@ -243,7 +243,7 @@ func TestBuildPostgresqlDSN(t *testing.T) {
 				cfg.Postgresql.SSLMode = "require"
 				return cfg
 			}(),
-			expected: "host=localhost port=5432 user=postgres password=password dbname=testdb sslmode=require",
+			expected: "host='localhost' port=5432 user='postgres' password='password' dbname='testdb' sslmode='require'",
 		},
 		{
 			name: "dsn with different host and port",
@@ -253,7 +253,7 @@ func TestBuildPostgresqlDSN(t *testing.T) {
 				cfg.Postgresql.Port = 5433
 				return cfg
 			}(),
-			expected: "host=db.example.com port=5433 user=postgres password=password dbname=testdb sslmode=disable",
+			expected: "host='db.example.com' port=5433 user='postgres' password='password' dbname='testdb' sslmode='disable'",
 		},
 	}
 
@@ -276,7 +276,7 @@ func TestBuildPostgresqlDSN(t *testing.T) {
 func TestConfigurePostgresqlPool(t *testing.T) {
 	// Create a mock sql.DB for testing
 	// Note: In a real test environment, you would use a test database
-	db, err := sql.Open("postgres", "host=localhost port=5432 user=postgres dbname=postgres sslmode=disable")
+	db, err := sql.Open("postgres", "host='localhost' port=5432 user='postgres' dbname='postgres' sslmode='disable'")
 	if err != nil {
 		t.Skip("Skipping test - PostgreSQL not available")
 	}

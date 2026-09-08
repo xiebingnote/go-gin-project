@@ -21,7 +21,7 @@ func setupTestLoggerForTDengine() {
 func setupTestTDengineConfig() {
 	config.TDengineConfig = &config.TDengineConfigEntry{}
 	config.TDengineConfig.TDengine.Host = "127.0.0.1"
-	config.TDengineConfig.TDengine.Port = 6030
+	config.TDengineConfig.TDengine.Port = 6041
 	config.TDengineConfig.TDengine.UserName = "root"
 	config.TDengineConfig.TDengine.PassWord = "taosdata"
 	config.TDengineConfig.TDengine.Database = "test"
@@ -216,20 +216,20 @@ func TestBuildTDengineDSN(t *testing.T) {
 			config: func() *config.TDengineConfigEntry {
 				cfg := &config.TDengineConfigEntry{}
 				cfg.TDengine.Host = "localhost"
-				cfg.TDengine.Port = 6030
+				cfg.TDengine.Port = 6041
 				cfg.TDengine.UserName = "root"
 				cfg.TDengine.PassWord = "taosdata"
 				cfg.TDengine.Database = "test"
 				return cfg
 			},
-			expected: "root:taosdata@tcp(localhost:6030)/test",
+			expected: "root:taosdata@ws(localhost:6041)/test",
 		},
 		{
 			name: "dsn with timeouts",
 			config: func() *config.TDengineConfigEntry {
 				cfg := &config.TDengineConfigEntry{}
 				cfg.TDengine.Host = "localhost"
-				cfg.TDengine.Port = 6030
+				cfg.TDengine.Port = 6041
 				cfg.TDengine.UserName = "root"
 				cfg.TDengine.PassWord = "taosdata"
 				cfg.TDengine.Database = "test"
@@ -237,7 +237,7 @@ func TestBuildTDengineDSN(t *testing.T) {
 				cfg.TDengine.ReadTimeout = 30 * time.Second
 				return cfg
 			},
-			expected: "root:taosdata@tcp(localhost:6030)/test?timeout=10000ms&readTimeout=30000ms",
+			expected: "root:taosdata@ws(localhost:6041)/test?readTimeout=30s",
 		},
 	}
 
@@ -247,95 +247,6 @@ func TestBuildTDengineDSN(t *testing.T) {
 			result := buildTDengineDSN(cfg)
 			if result != tt.expected {
 				t.Errorf("Expected DSN '%s', got '%s'", tt.expected, result)
-			}
-		})
-	}
-}
-
-// TestMaskPassword tests the `maskPassword` function.
-//
-// The function `maskPassword` takes a Data Source Name (DSN) as input and
-// returns a masked version where the password is replaced with asterisks.
-//
-// The test cases cover the following scenarios:
-//
-//  1. A basic DSN with a password, where the password should be masked.
-//  2. A DSN with additional parameters, ensuring the password is masked while
-//     keeping other parameters intact.
-//  3. A DSN without a password, which should remain unchanged.
-func TestMaskPassword(t *testing.T) {
-	tests := []struct {
-		name     string
-		dsn      string
-		expected string
-	}{
-		{
-			name:     "basic dsn",
-			dsn:      "root:taosdata@tcp(localhost:6030)/test",
-			expected: "root:***@tcp(localhost:6030)/test",
-		},
-		{
-			name:     "dsn with params",
-			dsn:      "user:pass123@tcp(host:6030)/db?timeout=10s",
-			expected: "user:***@tcp(host:6030)/db?timeout=10s",
-		},
-		{
-			name:     "no password",
-			dsn:      "tcp(localhost:6030)/test",
-			expected: "tcp(localhost:6030)/test",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := maskPassword(tt.dsn)
-			if result != tt.expected {
-				t.Errorf("Expected masked DSN '%s', got '%s'", tt.expected, result)
-			}
-		})
-	}
-}
-
-// TestJoinParams tests the `joinParams` function.
-//
-// The function takes a slice of strings representing individual parameters
-// and returns a single string where the parameters are joined together with
-// an ampersand (&) separator.
-//
-// The test cases cover the following scenarios:
-//
-//  1. An empty list of parameters, which should result in an empty string.
-//  2. A single parameter, which should result in the same string.
-//  3. Multiple parameters, which should result in a string with the parameters
-//     joined by an ampersand separator.
-func TestJoinParams(t *testing.T) {
-	tests := []struct {
-		name     string
-		params   []string
-		expected string
-	}{
-		{
-			name:     "empty params",
-			params:   []string{},
-			expected: "",
-		},
-		{
-			name:     "single param",
-			params:   []string{"timeout=10s"},
-			expected: "timeout=10s",
-		},
-		{
-			name:     "multiple params",
-			params:   []string{"timeout=10s", "readTimeout=30s"},
-			expected: "timeout=10s&readTimeout=30s",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := joinParams(tt.params)
-			if result != tt.expected {
-				t.Errorf("Expected joined params '%s', got '%s'", tt.expected, result)
 			}
 		})
 	}

@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"os"
 	"testing"
 	"time"
@@ -19,12 +21,24 @@ func setupTestLoggerForCasbin() {
 }
 
 // setupTestMySQLClient creates a mock MySQL client for testing
-func setupTestMySQLClient() error {
-	// Create a mock GORM DB instance
-	// In a real test environment, you would use a test database
-	resource.MySQLClient = &gorm.DB{}
+func setupTestMySQLClient(t *testing.T) error {
+	db := sql.OpenDB(casbinTestConnector{})
+	t.Cleanup(func() { _ = db.Close() })
+	resource.MySQLClient = &gorm.DB{Config: &gorm.Config{ConnPool: db}}
 	return nil
 }
+
+type casbinTestConnector struct{ driver.Connector }
+
+func (casbinTestConnector) Connect(context.Context) (driver.Conn, error) {
+	return casbinTestConn{}, nil
+}
+func (casbinTestConnector) Driver() driver.Driver { return nil }
+
+type casbinTestConn struct{ driver.Conn }
+
+func (casbinTestConn) Close() error               { return nil }
+func (casbinTestConn) Ping(context.Context) error { return nil }
 
 // createTestCasbinConfig creates a temporary Casbin configuration file for testing
 func createTestCasbinConfig() (string, error) {
@@ -92,7 +106,7 @@ func TestValidateCasbinDependencies(t *testing.T) {
 		{
 			name: "nil logger service",
 			setupFunc: func() error {
-				if err := setupTestMySQLClient(); err != nil {
+				if err := setupTestMySQLClient(t); err != nil {
 					return err
 				}
 				resource.LoggerService = nil
@@ -108,7 +122,7 @@ func TestValidateCasbinDependencies(t *testing.T) {
 			name: "missing config file",
 			setupFunc: func() error {
 				setupTestLoggerForCasbin()
-				if err := setupTestMySQLClient(); err != nil {
+				if err := setupTestMySQLClient(t); err != nil {
 					return err
 				}
 				// Set non-existent config path
@@ -126,7 +140,7 @@ func TestValidateCasbinDependencies(t *testing.T) {
 			name: "valid dependencies",
 			setupFunc: func() error {
 				setupTestLoggerForCasbin()
-				if err := setupTestMySQLClient(); err != nil {
+				if err := setupTestMySQLClient(t); err != nil {
 					return err
 				}
 
@@ -259,7 +273,7 @@ func TestInitCasbinEnforcer_WithValidSetup(t *testing.T) {
 	// Skip if we can't create a proper test environment
 	t.Skip("Skipping integration test - requires proper test environment setup")
 
-	if err := setupTestMySQLClient(); err != nil {
+	if err := setupTestMySQLClient(t); err != nil {
 		t.Fatalf("Failed to setup test MySQL client: %v", err)
 	}
 	defer func() {

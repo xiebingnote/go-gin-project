@@ -3,20 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/xiebingnote/go-gin-project/library/config"
 	"github.com/xiebingnote/go-gin-project/library/resource"
 
 	"github.com/IBM/sarama"
-)
-
-var (
-	// healthCheckCtx is the context used for health checks.
-	healthCheckCtx    context.Context
-	healthCheckCancel context.CancelFunc
-	healthCheckOnce   sync.Once
 )
 
 // InitKafka initializes the Kafka client connection.
@@ -364,45 +356,34 @@ func TestKafkaConnection(cfg *config.KafkaConfigEntry) error {
 //   - an error if any of the close operations fail
 //   - nil if all the close operations succeed
 func CloseKafka() error {
-	var errs []error
+	return CloseKafkaContext(context.Background())
+}
 
-	// Stop the health check goroutine
-	stopKafkaHealthCheck()
-
-	// Close the producer
-	if resource.KafkaProducer != nil {
-		if err := resource.KafkaProducer.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to close kafka producer: %w", err))
-		}
-		resource.KafkaProducer = nil
+// CloseKafkaContext drains consumers before the producer, bounded by ctx.
+func CloseKafkaContext(ctx context.Context) error {
+	closeCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if err := kafkaHealthWorker.stop(closeCtx); err != nil {
+		return err
 	}
-
-	// Close the consumer
-	if resource.KafkaConsumer != nil {
-		if err := resource.KafkaConsumer.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to close kafka consumer: %w", err))
-		}
-		resource.KafkaConsumer = nil
-	}
-
-	// Close the consumer group
-	if resource.KafkaConsumerGroup != nil {
-		if err := resource.KafkaConsumerGroup.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to close kafka consumer group: %w", err))
+	if group := resource.KafkaConsumerGroup; group != nil {
+		if err := waitForClose(closeCtx, group.Close); err != nil {
+			return fmt.Errorf("close kafka consumer group: %w", err)
 		}
 		resource.KafkaConsumerGroup = nil
 	}
-
-	// If any of the close operations fail, return a combined error
-	if len(errs) > 0 {
-		return fmt.Errorf("failed to close all kafka connections: %v", errs)
+	if consumer := resource.KafkaConsumer; consumer != nil {
+		if err := waitForClose(closeCtx, consumer.Close); err != nil {
+			return fmt.Errorf("close kafka consumer: %w", err)
+		}
+		resource.KafkaConsumer = nil
 	}
-
-	// Log a success message to indicate that all connections have been closed
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("🛑 successfully closed all kafka connections")
+	if producer := resource.KafkaProducer; producer != nil {
+		if err := waitForClose(closeCtx, producer.Close); err != nil {
+			return fmt.Errorf("close kafka producer: %w", err)
+		}
+		resource.KafkaProducer = nil
 	}
-
 	return nil
 }
 
@@ -410,27 +391,9 @@ func CloseKafka() error {
 //
 // This function starts a goroutine that periodically checks the health of the Kafka
 // connection. The goroutine will stop when the context is canceled.
-// The healthCheckOnce variable ensures that the health check goroutine is only
-// started once.
+// The health worker prevents duplicate starts and is joined during shutdown.
 func startKafkaHealthCheck(ctx context.Context) {
-	healthCheckOnce.Do(func() {
-		healthCheckCtx, healthCheckCancel = context.WithCancel(ctx)
-		go kafkaHealthCheck(healthCheckCtx)
-	})
-}
-
-// stopKafkaHealthCheck stops the Kafka health check goroutine.
-//
-// This function stops the Kafka health check goroutine. It is safe to call
-// this function multiple times.
-//
-// This function is used to stop the health check goroutine when the application
-// is being shut down.
-func stopKafkaHealthCheck() {
-	if healthCheckCancel != nil {
-		healthCheckCancel()
-		healthCheckCancel = nil
-	}
+	kafkaHealthWorker.start(ctx, kafkaHealthCheck)
 }
 
 // kafkaHealthCheck performs periodic health checks for Kafka.

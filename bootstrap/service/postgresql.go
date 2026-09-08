@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/xiebingnote/go-gin-project/library/config"
@@ -218,36 +219,25 @@ func TestPostgresqlConnection(db *gorm.DB) error {
 //     SQL DB object.
 //   - nil if the Postgresql client is nil or the connection is closed successfully.
 func ClosePostgresql() error {
-	// Check if the global PostgreSQL client is initialized.
-	if resource.PostgresqlClient == nil {
-		// The PostgreSQL client is nil, no connection to close.
+	return ClosePostgresqlContext(context.Background())
+}
+
+// ClosePostgresqlContext bounds driver cleanup and retains the handle on failure.
+func ClosePostgresqlContext(ctx context.Context) error {
+	client := resource.PostgresqlClient
+	if client == nil {
 		return nil
 	}
-
-	// Attempt to retrieve the underlying SQL DB object from the global PostgreSQL client.
-	// This is the same as calling resource.PostgresqlClient.DB()
-	sqlDB, err := resource.PostgresqlClient.DB()
+	closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	sqlDB, err := client.DB()
 	if err != nil {
-		// Return an error if there is an issue getting the SQL DB object,
-		// This should not happen unless the resource has been tampered with.
-		return fmt.Errorf("failed to get sql.DB: %w", err)
+		return fmt.Errorf("get sql.DB: %w", err)
 	}
-
-	// Attempt to close the PostgreSQL connection.
-	if err := sqlDB.Close(); err != nil {
-		// Return an error if closing the connection fails,
-		// This could happen if the connection is already closed.
-		return fmt.Errorf("failed to close postgresql connection: %w", err)
+	if err := waitForClose(closeCtx, sqlDB.Close); err != nil {
+		return fmt.Errorf("close postgresql: %w", err)
 	}
-
-	// Reset the global PostgreSQL client to nil.
 	resource.PostgresqlClient = nil
-
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("🛑 successfully closed postgresql connection")
-	}
-
-	// Return nil to indicate success.
 	return nil
 }
 
@@ -259,12 +249,10 @@ func ClosePostgresql() error {
 // Returns:
 //   - A properly formatted DSN string.
 func buildPostgresqlDSN(cfg *config.PostgresqlConfigEntry) string {
+	quote := func(value string) string {
+		return "'" + strings.NewReplacer("\\", "\\\\", "'", "\\'").Replace(value) + "'"
+	}
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		cfg.Postgresql.Host,
-		cfg.Postgresql.Port,
-		cfg.Postgresql.User,
-		cfg.Postgresql.Password,
-		cfg.Postgresql.DBName,
-		cfg.Postgresql.SSLMode,
-	)
+		quote(cfg.Postgresql.Host), cfg.Postgresql.Port, quote(cfg.Postgresql.User),
+		quote(cfg.Postgresql.Password), quote(cfg.Postgresql.DBName), quote(cfg.Postgresql.SSLMode))
 }

@@ -2,8 +2,13 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/xiebingnote/go-gin-project/library/config"
@@ -64,6 +69,7 @@ func InitManticoreClient(ctx context.Context) error {
 
 	// Test the connection
 	if err := testManticoreConnection(initCtx, client); err != nil {
+		client.GetConfig().HTTPClient.CloseIdleConnections()
 		return fmt.Errorf("manticore connection test failed: %w", err)
 	}
 
@@ -119,49 +125,41 @@ func validateManticoreDependencies() error {
 // Returns:
 //   - *manticore.APIClient: The created client
 //   - error: An error if client creation fails, nil otherwise
-func createManticoreClient(_ context.Context) (*manticore.APIClient, error) {
+func createManticoreClient(ctx context.Context) (*manticore.APIClient, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	cfg := &config.ManticoreConfig.Manticore
-
-	resource.LoggerService.Info(fmt.Sprintf("creating manticore client with %d endpoints", len(cfg.Endpoints)))
-
-	// Create a new ManticoreSearch configuration
 	configuration := manticore.NewConfiguration()
-
-	// Configure HTTP client with timeouts
-	httpClient := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			MaxIdleConns:        10,
-			MaxIdleConnsPerHost: 10,
-			IdleConnTimeout:     30 * time.Second,
-		},
-	}
-	configuration.HTTPClient = httpClient
-
-	// Configure servers
-	servers := make([]manticore.ServerConfiguration, len(cfg.Endpoints))
-	for i, endpoint := range cfg.Endpoints {
-		serverURL := fmt.Sprintf("http://%s:%d", endpoint, cfg.Port)
-		servers[i] = manticore.ServerConfiguration{
-			URL: serverURL,
+	configuration.Servers = nil
+	for _, endpoint := range cfg.Endpoints {
+		if !strings.Contains(endpoint, "://") {
+			endpoint = "http://" + net.JoinHostPort(endpoint, strconv.Itoa(cfg.Port))
 		}
-		resource.LoggerService.Info(fmt.Sprintf("configured manticore server: %s", serverURL))
-	}
-	configuration.Servers = servers
-
-	// Set authentication if configured
-	if cfg.UserName != "" && cfg.PassWord != "" {
-		configuration.DefaultHeader = map[string]string{
-			"Authorization": fmt.Sprintf("Basic %s", encodeBasicAuth(cfg.UserName, cfg.PassWord)),
+		u, err := url.Parse(endpoint)
+		if err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+			return nil, fmt.Errorf("invalid manticore endpoint (use a host or an HTTP(S) URL without credentials or query parameters)")
 		}
-		resource.LoggerService.Info("configured manticore authentication")
+		if cfg.UserName != "" || cfg.PassWord != "" {
+			if cfg.UserName == "" || strings.Contains(cfg.UserName, ":") {
+				return nil, fmt.Errorf("invalid manticore basic auth username")
+			}
+			if u.Scheme != "https" {
+				return nil, fmt.Errorf("manticore authentication requires HTTPS endpoints")
+			}
+		}
+		configuration.Servers = append(configuration.Servers, manticore.ServerConfiguration{URL: strings.TrimRight(u.String(), "/")})
 	}
-
-	// Create the API client
-	client := manticore.NewAPIClient(configuration)
-
-	resource.LoggerService.Info("successfully created manticore client")
-	return client, nil
+	configuration.HTTPClient = &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: &http.Transport{MaxIdleConns: 10, MaxIdleConnsPerHost: 10, IdleConnTimeout: 30 * time.Second},
+		// Keep credentials on the configured server and prohibit HTTPS downgrades.
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	if cfg.UserName != "" {
+		configuration.DefaultHeader["Authorization"] = "Basic " + encodeBasicAuth(cfg.UserName, cfg.PassWord)
+	}
+	return manticore.NewAPIClient(configuration), nil
 }
 
 // encodeBasicAuth encodes username and password for basic authentication.
@@ -173,9 +171,7 @@ func createManticoreClient(_ context.Context) (*manticore.APIClient, error) {
 // Returns:
 //   - string: Base64 encoded credentials
 func encodeBasicAuth(username, password string) string {
-	// This is a simplified implementation
-	// In production, you should use proper base64 encoding
-	return fmt.Sprintf("%s:%s", username, password)
+	return base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 }
 
 // testManticoreConnection tests the ManticoreSearch connection.
@@ -187,76 +183,36 @@ func encodeBasicAuth(username, password string) string {
 // Returns:
 //   - error: An error if connection test fails, nil otherwise
 func testManticoreConnection(ctx context.Context, client *manticore.APIClient) error {
-	resource.LoggerService.Info("testing manticore connection")
-
-	// Create timeout context for connection test
 	testCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-
-	// Test connection by trying to get server status or perform a simple operation
-	// Since ManticoreSearch doesn't have a direct ping endpoint, we'll try a simple search
-	done := make(chan error, 1)
-	go func() {
-		defer close(done)
-
-		// Try to perform a simple operation to test connectivity
-		// This is a basic connectivity test
-		searchRequest := manticore.NewSearchRequest("_test_connection_")
-		searchQuery := manticore.NewSearchQuery()
-		searchQuery.QueryString = "*"
-		searchRequest.Query = searchQuery
-
-		// Execute the search request (this may fail if index doesn't exist, but that's OK)
-		_, _, err := client.SearchAPI.Search(testCtx).SearchRequest(*searchRequest).Execute()
-
-		// We don't care about the specific error, just that we can connect
-		// Connection errors will be different from "index not found" errors
-		if err != nil {
-			// Check if it's a connection error or just an index not found error
-			errStr := err.Error()
-			if contains(errStr, "connection") || contains(errStr, "timeout") || contains(errStr, "refused") {
-				done <- fmt.Errorf("connection test failed: %w", err)
-				return
-			}
-			// If it's just an index error, the connection is working
-		}
-
-		done <- nil
-	}()
-
-	// Wait for connection test or timeout
-	select {
-	case err := <-done:
-		if err != nil {
-			resource.LoggerService.Error(fmt.Sprintf("manticore connection test failed: %v", err))
-			return err
-		}
-	case <-testCtx.Done():
-		resource.LoggerService.Error("manticore connection test timeout")
-		return fmt.Errorf("connection test timeout")
+	// SELECT 1 does not require an application index and does not modify data.
+	result, response, err := client.UtilsAPI.Sql(testCtx).Body("SELECT 1").Execute()
+	if err != nil {
+		return fmt.Errorf("manticore health check failed: %w", err)
 	}
-
-	resource.LoggerService.Info("manticore connection test completed successfully")
+	if response == nil || response.StatusCode < 200 || response.StatusCode >= 300 {
+		return fmt.Errorf("manticore health check returned an unsuccessful HTTP status")
+	}
+	if result == nil {
+		return fmt.Errorf("manticore health check returned no result")
+	}
+	var rows []map[string]interface{}
+	if result.ArrayOfMapmapOfStringinterface != nil {
+		rows = *result.ArrayOfMapmapOfStringinterface
+	}
+	if result.MapmapOfStringinterface != nil {
+		rows = append(rows, *result.MapmapOfStringinterface)
+	}
+	if len(rows) == 0 {
+		return fmt.Errorf("manticore health check returned an empty result")
+	}
+	for _, row := range rows {
+		// SQL failures can also be returned with HTTP 200.
+		if queryErr, ok := row["error"]; ok && queryErr != nil && fmt.Sprint(queryErr) != "" {
+			return fmt.Errorf("manticore health query failed: %v", queryErr)
+		}
+	}
 	return nil
-}
-
-// contains checks if a string contains a substring (case-insensitive).
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr ||
-		(len(s) > len(substr) &&
-			(s[:len(substr)] == substr ||
-				s[len(s)-len(substr):] == substr ||
-				containsHelper(s, substr))))
-}
-
-// containsHelper is a helper function for substring search.
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
 
 // CloseManticore closes the ManticoreSearch client connection gracefully.
@@ -272,50 +228,21 @@ func containsHelper(s, substr string) bool {
 // 2. Performs any necessary cleanup operations
 // 3. Clears the global resource reference
 func CloseManticore(ctx context.Context) error {
-	if resource.ManticoreClient == nil {
+	client := resource.ManticoreClient
+	if client == nil {
 		return nil
 	}
-
-	resource.LoggerService.Info("closing manticore client")
-
-	// Create timeout context for close operation
+	httpClient := client.GetConfig().HTTPClient
 	closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-
-	// Perform cleanup operations
-	done := make(chan error, 1)
-	go func() {
-		defer close(done)
-
-		// Close idle connections of the HTTP client
-		if httpClient := resource.ManticoreClient.GetConfig().HTTPClient; httpClient != nil {
-			if transport, ok := httpClient.Transport.(*http.Transport); ok {
-				transport.CloseIdleConnections()
-			}
+	if err := waitForClose(closeCtx, func() error {
+		if httpClient != nil {
+			httpClient.CloseIdleConnections()
 		}
-
-		// Clear the global reference
-		resource.ManticoreClient = nil
-		done <- nil
-	}()
-
-	// Wait for cleanup operation or timeout
-	select {
-	case err := <-done:
-		if err != nil {
-			resource.LoggerService.Error(fmt.Sprintf("failed to close manticore client: %v", err))
-			return err
-		}
-	case <-closeCtx.Done():
-		resource.LoggerService.Error("manticore client close timeout")
-		// Still clear the reference even on timeout
-		resource.ManticoreClient = nil
-		return fmt.Errorf("manticore client close timeout")
+		return nil
+	}); err != nil {
+		return fmt.Errorf("close manticore: %w", err)
 	}
-
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("🛑 successfully closed manticore client")
-	}
-
+	resource.ManticoreClient = nil
 	return nil
 }

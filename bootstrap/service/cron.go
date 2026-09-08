@@ -77,7 +77,9 @@ func InitCronScheduler(ctx context.Context) error {
 
 	// Start health check if configured
 	if config.CronConfig.Cron.HealthCheckInterval > 0 {
-		go startCronHealthCheck(ctx, config.CronConfig.Cron.HealthCheckInterval*time.Second)
+		cronHealthWorker.start(ctx, func(workerCtx context.Context) {
+			startCronHealthCheck(workerCtx, config.CronConfig.Cron.HealthCheckInterval*time.Second)
+		})
 	}
 
 	resource.LoggerService.Info("successfully initialized cron scheduler")
@@ -161,25 +163,16 @@ func createCronScheduler(ctx context.Context) (gocron.Scheduler, error) {
 		resource.LoggerService.Info(fmt.Sprintf("cron scheduler max concurrent jobs: %d", cfg.MaxConcurrentJobs))
 	}
 
-	// Create scheduler with timeout
-	done := make(chan struct{})
-	var scheduler gocron.Scheduler
-
-	go func() {
-		defer close(done)
-		scheduler, err = gocron.NewScheduler(options...)
-	}()
-
-	// Wait for scheduler creation or timeout
-	select {
-	case <-done:
-		if err != nil {
-			resource.LoggerService.Error(fmt.Sprintf("failed to create cron scheduler: %v", err))
-			return nil, err
-		}
-	case <-ctx.Done():
-		resource.LoggerService.Error("cron scheduler creation timeout")
-		return nil, fmt.Errorf("scheduler creation timeout")
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	scheduler, err := gocron.NewScheduler(options...)
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		_ = scheduler.Shutdown()
+		return nil, err
 	}
 
 	resource.LoggerService.Info("successfully created cron scheduler")
@@ -195,54 +188,18 @@ func createCronScheduler(ctx context.Context) (gocron.Scheduler, error) {
 // Returns:
 //   - error: An error if validation fails, nil otherwise
 func validateCronScheduler(ctx context.Context, scheduler gocron.Scheduler) error {
-	resource.LoggerService.Info("validating cron scheduler functionality")
-
-	// Test basic scheduler functionality by creating a test job
-	testJobExecuted := false
-	testJob := func() {
-		testJobExecuted = true
-		resource.LoggerService.Info("cron scheduler test job executed successfully")
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-
-	// Create a test job that runs immediately
-	job, err := scheduler.NewJob(
-		gocron.OneTimeJob(gocron.OneTimeJobStartImmediately()),
-		gocron.NewTask(testJob),
-	)
+	if scheduler == nil {
+		return fmt.Errorf("cron scheduler is nil")
+	}
+	// Validate registration without starting the real scheduler or executing jobs.
+	job, err := scheduler.NewJob(gocron.DurationJob(time.Hour), gocron.NewTask(func() {}))
 	if err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("failed to create test job: %v", err))
-		return fmt.Errorf("failed to create test job: %w", err)
+		return fmt.Errorf("register validation job: %w", err)
 	}
-
-	// Start the scheduler temporarily for testing
-	scheduler.Start()
-	defer func() {
-		// Remove the test job after validation
-		if removeErr := scheduler.RemoveJob(job.ID()); removeErr != nil {
-			resource.LoggerService.Error(fmt.Sprintf("failed to remove test job: %v", removeErr))
-		}
-	}()
-
-	// Wait for the test job to execute or timeout
-	timeout := time.After(5 * time.Second)
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-timeout:
-			resource.LoggerService.Error("cron scheduler test job execution timeout")
-			return fmt.Errorf("test job execution timeout")
-		case <-ticker.C:
-			if testJobExecuted {
-				resource.LoggerService.Info("cron scheduler validation completed successfully")
-				return nil
-			}
-		case <-ctx.Done():
-			resource.LoggerService.Error("cron scheduler validation cancelled")
-			return fmt.Errorf("validation cancelled")
-		}
-	}
+	return scheduler.RemoveJob(job.ID())
 }
 
 // startCronHealthCheck starts a background health check for the Cron scheduler.
@@ -299,49 +256,18 @@ func startCronHealthCheck(ctx context.Context, interval time.Duration) {
 // 3. Shuts down the scheduler
 // 4. Clears the global resource reference
 func CloseCron(ctx context.Context) error {
-	if resource.Corn == nil {
-		return nil
-	}
-
-	resource.LoggerService.Info("closing cron scheduler")
-
-	// Create timeout context for close operation
 	closeCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-
-	// Get current jobs for logging
-	jobs := resource.Corn.Jobs()
-	resource.LoggerService.Info(fmt.Sprintf("stopping %d cron jobs", len(jobs)))
-
-	// Shutdown the scheduler gracefully
-	done := make(chan error, 1)
-	go func() {
-		defer close(done)
-		if err := resource.Corn.Shutdown(); err != nil {
-			done <- fmt.Errorf("failed to shutdown cron scheduler: %w", err)
-			return
-		}
-		done <- nil
-	}()
-
-	// Wait for shutdown operation or timeout
-	select {
-	case err := <-done:
-		if err != nil {
-			resource.LoggerService.Error(fmt.Sprintf("failed to shutdown cron scheduler: %v", err))
-			return err
-		}
-	case <-closeCtx.Done():
-		resource.LoggerService.Error("cron scheduler shutdown timeout")
-		return fmt.Errorf("cron scheduler shutdown timeout")
+	if err := cronHealthWorker.stop(closeCtx); err != nil {
+		return err
 	}
-
-	// Clear the global scheduler reference
+	scheduler := resource.Corn
+	if scheduler == nil {
+		return nil
+	}
+	if err := waitForClose(closeCtx, scheduler.Shutdown); err != nil {
+		return fmt.Errorf("shutdown cron scheduler: %w", err)
+	}
 	resource.Corn = nil
-
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("🛑 successfully closed cron scheduler")
-	}
-
 	return nil
 }

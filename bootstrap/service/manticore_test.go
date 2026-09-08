@@ -156,6 +156,7 @@ func TestCreateManticoreClient(t *testing.T) {
 			name: "with authentication",
 			setupConfig: func() {
 				setupTestManticoreConfig()
+				config.ManticoreConfig.Manticore.Endpoints = []string{"https://localhost:9308"}
 				config.ManticoreConfig.Manticore.UserName = "testuser"
 				config.ManticoreConfig.Manticore.PassWord = "testpass"
 			},
@@ -201,8 +202,8 @@ func TestCreateManticoreClient(t *testing.T) {
 // scenarios:
 //
 //  1. Simple credentials with a username and password.
-//  2. Empty password, which results in a colon (:) at the end of the string.
-//  3. Empty username, which results in a leading colon (:) in the string.
+//  2. Empty password, preserving the separator before Base64 encoding.
+//  3. Empty username, preserving the separator before Base64 encoding.
 func TestEncodeBasicAuth(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -214,19 +215,19 @@ func TestEncodeBasicAuth(t *testing.T) {
 			name:     "simple credentials",
 			username: "user",
 			password: "pass",
-			expected: "user:pass",
+			expected: "dXNlcjpwYXNz",
 		},
 		{
 			name:     "empty password",
 			username: "user",
 			password: "",
-			expected: "user:",
+			expected: "dXNlcjo=",
 		},
 		{
 			name:     "empty username",
 			username: "",
 			password: "pass",
-			expected: ":pass",
+			expected: "OnBhc3M=",
 		},
 	}
 
@@ -235,63 +236,6 @@ func TestEncodeBasicAuth(t *testing.T) {
 			result := encodeBasicAuth(tt.username, tt.password)
 			if result != tt.expected {
 				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
-			}
-		})
-	}
-}
-
-// TestContains tests the `contains` function with various strings and substrings.
-// The test cases cover the following scenarios:
-//
-//  1. The substring is at the start of the string.
-//  2. The substring is at the end of the string.
-//  3. The substring is in the middle of the string.
-//  4. The substring is not present in the string.
-//  5. The substring is an exact match of the string.
-func TestContains(t *testing.T) {
-	tests := []struct {
-		name     string
-		s        string
-		substr   string
-		expected bool
-	}{
-		{
-			name:     "contains at start",
-			s:        "connection error",
-			substr:   "connection",
-			expected: true,
-		},
-		{
-			name:     "contains at end",
-			s:        "network timeout",
-			substr:   "timeout",
-			expected: true,
-		},
-		{
-			name:     "contains in middle",
-			s:        "network connection error",
-			substr:   "connection",
-			expected: true,
-		},
-		{
-			name:     "does not contain",
-			s:        "success",
-			substr:   "error",
-			expected: false,
-		},
-		{
-			name:     "exact match",
-			s:        "error",
-			substr:   "error",
-			expected: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := contains(tt.s, tt.substr)
-			if result != tt.expected {
-				t.Errorf("Expected %v, got %v", tt.expected, result)
 			}
 		})
 	}
