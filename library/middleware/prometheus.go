@@ -10,9 +10,6 @@ import (
 
 // prometheus.CounterVec
 var (
-	// Timer 启动时间
-	Timer = prometheus.NewTimer(ServerStartupDuration)
-
 	// AppStartTime 启动时间
 	AppStartTime = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{

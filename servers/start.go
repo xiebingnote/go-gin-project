@@ -1,164 +1,148 @@
 package servers
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
-	_ "net/http/pprof"
+	"net/http/pprof"
+	"sync"
 	"time"
-
-	"github.com/xiebingnote/go-gin-project/library/config"
-	"github.com/xiebingnote/go-gin-project/library/middleware"
-	"github.com/xiebingnote/go-gin-project/library/resource"
-	resp "github.com/xiebingnote/go-gin-project/library/response"
-	"github.com/xiebingnote/go-gin-project/servers/httpserver"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/xiebingnote/go-gin-project/library/config"
+	"github.com/xiebingnote/go-gin-project/library/middleware"
+	resp "github.com/xiebingnote/go-gin-project/library/response"
+	"github.com/xiebingnote/go-gin-project/servers/httpserver"
 )
 
-// Start initializes and starts both the main and admin HTTP servers.
-//
-// It creates a buffered error channel to capture any errors that occur
-// when running the servers. The main server is started with the configuration
-// and handler provided by newMainServer, while the admin server is started
-// with the configuration and handler from newAdminServer. Both servers are
-// run in separate goroutines, and any errors encountered are sent to the
-// error channel.
-//
-// Returns:
-//   - mainSrv: The HTTP server for the main interface.
-//   - adminSrv: The HTTP server for the admin interface.
-//   - errChan: A channel for receiving errors from the servers.
-func Start() (mainSrv *http.Server, adminSrv *http.Server, errChan chan error) {
-	// Create an error channel with a buffer size of 2 to capture errors from both servers.
-	errChan = make(chan error, 2)
-
-	// Start the main server with the provided configuration and handler.
-	mainSrv = newMainServer(config.ServerConfig, httpserver.NewServer())
-	go func() {
-		// Run the main server and send any errors to the error channel.
-		if err := runServer(mainSrv, "main"); err != nil {
-			errChan <- err
-		}
-	}()
-
-	// Start the admin server with the provided configuration and handler.
-	adminSrv = newAdminServer(config.ServerConfig, newAdminHandler())
-	go func() {
-		// Run the admin server and send any errors to the error channel.
-		if err := runServer(adminSrv, "admin"); err != nil {
-			errChan <- err
-		}
-	}()
-
-	// Return the initialized servers and the error channel.
-	return mainSrv, adminSrv, errChan
+type Pair struct {
+	Main   *http.Server
+	Admin  *http.Server
+	Errors <-chan error
 }
 
-// newMainServer creates a new HTTP server for the main interface.
-//
-// The server is configured with the given configuration and uses the given
-// handler for the main routes. This function creates a new HTTP server with the
-// provided configuration and handler. The server will listen to the specified
-// address and will use the provided handler for processing requests.
-//
-// Parameters:
-//   - cfg: The ServerConfigEntry containing configuration settings for the main server.
-//   - handler: The HTTP handler for processing main requests.
-//
-// Returns:
-//   - A pointer to one http.Server configured for the main interface.
+// Start binds both listeners before serving requests. A partial bind failure
+// releases the first listener, and runtime errors remain observable until exit.
+func Start(ctx context.Context) (*Pair, error) {
+	cfg := config.ServerConfig
+	if cfg == nil {
+		return nil, errors.New("server configuration is not initialized")
+	}
+	if err := validateAdminAddress(cfg.AdminServer.Listen); err != nil {
+		return nil, err
+	}
+	mainSrv := newMainServer(cfg, httpserver.NewServer())
+	adminSrv := newAdminServer(cfg, newAdminHandler(cfg.Options))
+	return startPair(ctx, mainSrv, adminSrv)
+}
+
+func startPair(ctx context.Context, mainSrv, adminSrv *http.Server) (*Pair, error) {
+	var listenConfig net.ListenConfig
+	mainListener, err := listenConfig.Listen(ctx, "tcp", mainSrv.Addr)
+	if err != nil {
+		return nil, fmt.Errorf("main server listen: %w", err)
+	}
+	adminListener, err := listenConfig.Listen(ctx, "tcp", adminSrv.Addr)
+	if err != nil {
+		return nil, errors.Join(fmt.Errorf("admin server listen: %w", err), mainListener.Close())
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, errors.Join(err, mainListener.Close(), adminListener.Close())
+	}
+	mainSrv.Addr = mainListener.Addr().String()
+	adminSrv.Addr = adminListener.Addr().String()
+	errChan := make(chan error, 2)
+	var wg sync.WaitGroup
+	serve := func(srv *http.Server, listener net.Listener, name string) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := runServer(srv, listener, name); err != nil {
+				errChan <- err
+			}
+		}()
+	}
+	serve(mainSrv, mainListener, "main")
+	serve(adminSrv, adminListener, "admin")
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+	return &Pair{Main: mainSrv, Admin: adminSrv, Errors: errChan}, nil
+}
+
 func newMainServer(cfg *config.ServerConfigEntry, handler http.Handler) *http.Server {
-	// Create a new HTTP server with the given configuration.
 	return &http.Server{
-		Addr:         cfg.HTTPServer.Listen,                     // Listen to the address for the main server.
-		Handler:      handler,                                   // HTTP handler for the main routes.
-		ReadTimeout:  cfg.HTTPServer.ReadTimeout * time.Second,  // Read timeout for incoming requests.
-		WriteTimeout: cfg.HTTPServer.WriteTimeout * time.Second, // Write timeout for outgoing responses.
-		IdleTimeout:  cfg.HTTPServer.IdleTimeout * time.Second,  // Idle timeout for keep-alive connections.
+		Addr:         cfg.HTTPServer.Listen,
+		Handler:      handler,
+		ReadTimeout:  cfg.HTTPServer.ReadTimeout * time.Second,
+		WriteTimeout: cfg.HTTPServer.WriteTimeout * time.Second,
+		IdleTimeout:  cfg.HTTPServer.IdleTimeout * time.Second,
 	}
 }
 
-// newAdminServer creates and returns a new HTTP server for the admin interface.
-//
-// The server is configured using the provided ServerConfigEntry, which
-// specifies the listen address and timeout settings. The provided handler
-// is used to handle incoming requests on the admin routes.
-//
-// Parameters:
-//   - cfg: The ServerConfigEntry containing configuration settings for the admin server.
-//   - handler: The HTTP handler for processing admin requests.
-//
-// Returns:
-//   - A pointer to one http.Server configured for the admin interface.
 func newAdminServer(cfg *config.ServerConfigEntry, handler http.Handler) *http.Server {
-	// Create a new HTTP server with the given configuration.
 	return &http.Server{
-		Addr:         cfg.AdminServer.Listen,                    // Listen to the address for the admin server.
-		Handler:      handler,                                   // HTTP handler for the admin routes.
-		ReadTimeout:  cfg.HTTPServer.ReadTimeout * time.Second,  // Read timeout for incoming requests.
-		WriteTimeout: cfg.HTTPServer.WriteTimeout * time.Second, // Write timeout for outgoing responses.
-		IdleTimeout:  cfg.HTTPServer.IdleTimeout * time.Second,  // Idle timeout for keep-alive connections.
+		Addr:         cfg.AdminServer.Listen,
+		Handler:      handler,
+		ReadTimeout:  cfg.HTTPServer.ReadTimeout * time.Second,
+		WriteTimeout: cfg.HTTPServer.WriteTimeout * time.Second,
+		IdleTimeout:  cfg.HTTPServer.IdleTimeout * time.Second,
 	}
 }
 
-// runServer starts the HTTP server and listens for incoming requests.
-//
-// If the server fails to start or encounters an error (other than a closed server error),
-// it returns an error with a formatted message indicating the server name.
-//
-// Parameters:
-//   - srv: The HTTP server to run.
-//   - name: The name of the server to format in the error message.
-//
-// Returns:
-//   - An error indicating the reason for the server failure.
-func runServer(srv *http.Server, name string) error {
-	// Attempt to start the server and listen for incoming requests.
-	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		// Log and return a formatted error message if the server fails to start.
-		errMsg := fmt.Sprintf("%s server failed: %v", name, err)
-		resource.LoggerService.Error(errMsg)
+func runServer(srv *http.Server, listener net.Listener, name string) error {
+	if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("%s server failed: %w", name, err)
 	}
-	// Return nil if the server shuts down gracefully.
 	return nil
 }
 
-// newAdminHandler returns a new HTTP handler for the admin interface.
-//
-// The returned handler registers the following endpoints:
-//   - /debug/pprof/ (via gin.WrapH(http.DefaultServeMux)): the pprof debug endpoints.
-//   - /metrics: Prometheus metrics endpoint.
-//   - /test: a test endpoint that returns a 200 OK response with a UUID.
-//
-// The handler also uses the Gin recovery middleware to recover from panics and return a 500 Internal Server Error response.
-// The middleware.PrometheusMiddleware is used to register the Prometheus metrics endpoint.
-func newAdminHandler() http.Handler {
-	// Create a new Gin router for handling admin routes.
+func validateAdminAddress(address string) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return fmt.Errorf("invalid admin listen address: %w", err)
+	}
+	ip := net.ParseIP(host)
+	if ip == nil || !ip.IsLoopback() {
+		return errors.New("admin server must listen on a loopback IP, such as 127.0.0.1 or ::1")
+	}
+	return nil
+}
+
+func newAdminHandler(opts config.ServerOptions) http.Handler {
 	router := gin.New()
-	// Use the Gin recovery middleware to recover from panics and return a 500 Internal Server Error response.
-	router.Use(gin.Recovery(), middleware.PrometheusMiddleware())
-
-	// Register the pprof debug endpoints using the default HTTP ServeMux.
-	// The pprof package provides the http.DefaultServeMux handler, which serves the pprof debug endpoints.
-	router.GET("/debug/pprof/", gin.WrapH(http.DefaultServeMux))
-	// The pprof package also provides a handler for the ":profile" endpoint.
-	// This endpoint serves the pprof profile data for the given profile name.
-	router.GET("/debug/pprof/:profile", gin.WrapH(http.DefaultServeMux))
-
-	// Register the Prometheus metrics endpoint.
-	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
-
-	// Register a test endpoint that returns a 200 OK response with a UUID.
-	// This endpoint can be used to test the admin server.
+	router.Use(gin.Recovery(), func(c *gin.Context) {
+		// Trust the TCP peer, never forwarding headers supplied by the caller.
+		host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
+		ip := net.ParseIP(host)
+		if err != nil || ip == nil || !ip.IsLoopback() {
+			c.AbortWithStatus(http.StatusForbidden)
+			return
+		}
+		c.Next()
+	})
+	if opts.EnableMetrics {
+		router.Use(middleware.PrometheusMiddleware())
+		router.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	}
+	if opts.EnablePprof {
+		// Explicit registrations avoid exposing unrelated DefaultServeMux handlers.
+		router.GET("/debug/pprof/", gin.WrapF(pprof.Index))
+		router.GET("/debug/pprof/cmdline", gin.WrapF(pprof.Cmdline))
+		router.GET("/debug/pprof/profile", gin.WrapF(pprof.Profile))
+		router.GET("/debug/pprof/symbol", gin.WrapF(pprof.Symbol))
+		router.GET("/debug/pprof/trace", gin.WrapF(pprof.Trace))
+		for _, profile := range []string{"allocs", "block", "goroutine", "heap", "mutex", "threadcreate"} {
+			router.GET("/debug/pprof/"+profile, gin.WrapH(pprof.Handler(profile)))
+		}
+	}
 	router.GET("/test", func(c *gin.Context) {
-		// Respond with a 200-OK status and a message.
 		resp.NewOKResp(c, "Metrics endpoint test", uuid.NewString())
 	})
-
-	// Return the configured Gin router as the admin HTTP handler.
 	return router
 }

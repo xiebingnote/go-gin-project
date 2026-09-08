@@ -2,311 +2,213 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"runtime"
 	"runtime/debug"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/xiebingnote/go-gin-project/bootstrap"
+	"github.com/xiebingnote/go-gin-project/library/config"
 	"github.com/xiebingnote/go-gin-project/library/middleware"
 	"github.com/xiebingnote/go-gin-project/library/resource"
-	"github.com/xiebingnote/go-gin-project/pkg/shutdown"
 	"github.com/xiebingnote/go-gin-project/servers"
-
 	"go.uber.org/zap"
 )
 
-// AppTimeouts represents the timeouts used during startup and shutdown.
 type AppTimeouts struct {
 	StartupCheck    time.Duration
 	ServerShutdown  time.Duration
 	ResourceCleanup time.Duration
 }
 
-// AppTimeouts represents the timeouts used during startup and shutdown.
 var defaultTimeouts = AppTimeouts{
 	StartupCheck:    5 * time.Second,
 	ServerShutdown:  10 * time.Second,
 	ResourceCleanup: 15 * time.Second,
 }
 
-// StartupError represents an error that occurred during startup.
-type StartupError struct {
-	Component string
-	Err       error
-	Retryable bool
+// application owns the lifecycle of the initialized resources and HTTP servers.
+type application struct {
+	initialize func(context.Context)
+	start      func(context.Context) (*servers.Pair, error)
+	cleanup    func(context.Context) error
 }
 
-// ServerPair represents a pair of main and admin servers.
-type ServerPair struct {
-	Main  *http.Server
-	Admin *http.Server
-}
-
-// Error implements the error interface and returns a string representation
-// of the error.
-//
-// The format of the string is: "startup failed for <component>: <err>".
-//
-// The component is the name of the component that failed to start, and
-// err is the underlying error that caused the startup to fail.
-func (e *StartupError) Error() string {
-	return fmt.Sprintf("startup failed for %s: %v", e.Component, e.Err)
-}
-
-// Unwrap returns the underlying error that caused the startup to fail.
-// It implements the `Unwrap` method of the `errors.Unwrap` interface.
-func (e *StartupError) Unwrap() error {
-	return e.Err
-}
-
-// main is the entry point of the application, responsible for initializing
-// components, starting the servers, starting background tasks, logging startup
-// metrics, and setting up graceful shutdown to handle termination signals.
-//
-// The main function performs the following tasks:
-//  1. Initializes all components using the bootstrap package.
-//  2. Starts the main and admin servers and records startup metrics.
-//  3. Starts background tasks such as memory monitoring and uptime updates.
-//  4. Logs the time taken to complete startup and the addresses of the main and
-//     admin servers.
-//  5. Sets up graceful shutdown to handle termination signals.
 func main() {
-	// Record the application start time for metrics
-	startTime := time.Now()
-	middleware.AppStartTime.WithLabelValues("1.0.0").Set(float64(startTime.Unix()))
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	app := application{
+		initialize: bootstrap.MustInit,
+		start:      servers.Start,
+		cleanup:    bootstrap.Close,
+	}
+	err := app.run(ctx, defaultTimeouts)
+	stop()
+	if err != nil {
+		// run has already finished cleanup; os.Exit must not bypass its defers.
+		log.Printf("Application failed: %v", err)
+		os.Exit(1)
+	}
+}
 
-	// Handle panics gracefully and log them
+func (app application) run(ctx context.Context, timeouts AppTimeouts) (err error) {
+	var pair *servers.Pair
+	var stopBackground func()
+	// Recover after cleanup, including failures during partial initialization.
 	defer func() {
 		if r := recover(); r != nil {
-			handlePanic(r)
+			log.Printf("Application panic: %v\n%s", r, debug.Stack())
+			err = errors.Join(err, fmt.Errorf("application panic: %v", r))
 		}
 	}()
-
-	// 1. Initialize all components
-	ctx := context.Background()
-	bootstrap.MustInit(ctx)
-
-	// 2. Start the servers and monitor startup metrics
-	serverPair, err := startServersWithMetrics()
-	if err != nil {
-		resource.LoggerService.Fatal("Failed to start serverPair", zap.Error(err))
-	}
-
-	// 3. Start background tasks such as memory monitoring and uptime updates
-	startBackgroundTasks()
-
-	// 4. Log the time taken to complete startup
-	startupDuration := time.Since(startTime)
-	middleware.ServerStartupDuration.Observe(startupDuration.Seconds())
-	resource.LoggerService.Info("✅ Application started successfully",
-		zap.Duration("startup_duration", startupDuration),
-		zap.String("main_server", serverPair.Main.Addr),
-		zap.String("admin_server", serverPair.Admin.Addr),
-	)
-
-	// 5. Set up graceful shutdown to handle termination signals
-	setupGracefulShutdown(serverPair, defaultTimeouts)
-}
-
-// startServersWithMetrics starts the main and admin servers and records startup metrics.
-// It returns a ServerPair containing the main and admin servers, or an error if the startup fails.
-func startServersWithMetrics() (*ServerPair, error) {
-	// Record the time taken to start the servers
-	defer middleware.Timer.ObserveDuration()
-
-	// Start the main and admin servers
-	mainSrv, adminSrv, errChan := servers.Start()
-
-	// Wait for the servers to start or return an error if the startup fails
-	select {
-	case err := <-errChan:
-		// If the startup fails, return a StartupError with the component name and error
-		return nil, &StartupError{
-			Component: "servers",
-			Err:       err,
-			Retryable: false,
+	defer func() {
+		if stopBackground != nil {
+			stopBackground()
 		}
-	case <-time.After(100 * time.Millisecond):
-		// If the servers start successfully, return a ServerPair containing the main and admin servers
-	}
-
-	return &ServerPair{
-		Main:  mainSrv,
-		Admin: adminSrv,
-	}, nil
-}
-
-// startBackgroundTasks starts the background tasks.
-//
-// This function starts the background tasks such as memory monitoring
-// and uptime updating.
-func startBackgroundTasks() {
-	// Start memory monitoring
-	//
-	// The memory monitor logs the current memory usage every 5
-	// minutes and triggers a manual GC if the memory usage exceeds
-	// 500MB.
-	startMemoryMonitor()
-
-	// Start updating the uptime
-	//
-	//  updater logs the current uptime every 30 seconds.
-	startUptimeUpdater()
-}
-
-// startMemoryMonitor starts monitoring memory usage and logs memory statistics
-// every 5 minutes. If the allocated memory exceeds 500MB, it triggers a manual
-// garbage collection (GC) to free up memory.
-func startMemoryMonitor() {
-	// Create a ticker that ticks every 5 minutes
-	ticker := time.NewTicker(5 * time.Minute)
-
-	// Run the monitoring logic in a separate goroutine
-	go func() {
-		defer ticker.Stop() // Ensure ticker is stopped when the goroutine exits
-
-		// Continuously monitor memory usage at each tick
-		for range ticker.C {
-			var m runtime.MemStats
-			// Read current memory statistics
-			runtime.ReadMemStats(&m)
-
-			// Trigger GC if allocated memory exceeds 1GB
-			if m.Alloc > 1024*1024*1024 {
-				runtime.GC()
-				resource.LoggerService.Info("Triggered manual GC due to high memory usage")
+		shutdownErr := shutdownServers(pair, timeouts.ServerShutdown)
+		err = errors.Join(err, shutdownErr)
+		if pair != nil && pair.Errors != nil {
+			// Preserve a serve error even when cancellation won the main select.
+			for serveErr := range pair.Errors {
+				err = errors.Join(err, serveErr)
 			}
 		}
+		if shutdownErr != nil {
+			// A timed-out handler may still use shared resources after Close.
+			// Leave those resources intact until the process exits with an error.
+			log.Print("HTTP shutdown incomplete; skipping shared resource cleanup")
+			return
+		}
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), timeouts.ResourceCleanup)
+		defer cancel()
+		if cleanupErr := app.cleanup(cleanupCtx); cleanupErr != nil {
+			err = errors.Join(err, fmt.Errorf("resource cleanup: %w", cleanupErr))
+		}
 	}()
-}
 
-// startUptimeUpdater starts the uptime updater goroutine.
-//
-// The uptime updater logs the current uptime every 30 seconds.
-func startUptimeUpdater() {
+	if ctx.Err() != nil {
+		return nil
+	}
 	startTime := time.Now()
-	ticker := time.NewTicker(30 * time.Second)
-	go func() {
-		defer ticker.Stop() // Ensure ticker is stopped when the goroutine exits
+	app.initialize(ctx)
+	if ctx.Err() != nil {
+		return nil
+	}
 
-		// Continuously update the uptime every 30 seconds
-		for range ticker.C {
-			uptime := time.Since(startTime).Seconds()
-			middleware.AppUptime.WithLabelValues("1.0.0").Set(uptime)
+	startupCtx, cancel := context.WithTimeout(ctx, timeouts.StartupCheck)
+	defer cancel()
+	pair, err = app.start(startupCtx)
+	cancel()
+	if err != nil {
+		if ctx.Err() != nil && errors.Is(err, context.Canceled) {
+			return nil
 		}
-	}()
-}
+		return fmt.Errorf("server startup: %w", err)
+	}
 
-// setupGracefulShutdown sets up the shutdown hook to handle termination signals.
-//
-// The shutdown hook is used to perform the following tasks in order:
-//  1. Shut down the main server with a timeout.
-//  2. Shut down the admin server with a timeout.
-//  3. Clean up resources with a timeout.
-func setupGracefulShutdown(servers *ServerPair, timeouts AppTimeouts) {
-	shutdown.NewHook().Close(
-		// Close the main server with a timeout
-		func() {
-			shutdownServerWithTimeout("main", servers.Main, timeouts.ServerShutdown)
-		},
-		// Close the admin server with a timeout
-		func() {
-			shutdownServerWithTimeout("admin", servers.Admin, timeouts.ServerShutdown)
-		},
-		// Clean up resources with a timeout
-		func() {
-			cleanupResourcesWithTimeout(timeouts.ResourceCleanup)
-		},
+	version := "unknown"
+	if config.ServerConfig != nil {
+		version = config.ServerConfig.Version.Version
+	}
+	logger := resource.LoggerService
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	middleware.AppStartTime.WithLabelValues(version).Set(float64(startTime.Unix()))
+	stopBackground = startBackgroundTasks(ctx, startTime, version, logger)
+	startupDuration := time.Since(startTime)
+	middleware.ServerStartupDuration.Observe(startupDuration.Seconds())
+	logger.Info("Application started successfully",
+		zap.Duration("startup_duration", startupDuration),
+		zap.String("main_server", pair.Main.Addr),
+		zap.String("admin_server", pair.Admin.Addr),
 	)
+
+	select {
+	case <-ctx.Done():
+		return nil
+	case serveErr, ok := <-pair.Errors:
+		if !ok {
+			return errors.New("HTTP servers stopped unexpectedly")
+		}
+		return serveErr
+	}
 }
 
-// shutdownServerWithTimeout gracefully shuts down the specified HTTP server
-// within a given timeout period. It logs the shutdown process and any errors encountered.
-//
-// Parameters:
-//   - name: The name of the server being shut down.
-//   - srv: The HTTP server instance to be shut down.
-//   - timeout: The maximum duration allowed for the server to shut down.
-func shutdownServerWithTimeout(name string, srv *http.Server, timeout time.Duration) {
-	// Log that the server shutdown process has started
-	if resource.LoggerService != nil {
-		resource.LoggerService.Info("🛑 Shutting down server",
-			zap.String("server", name),
-			zap.Duration("timeout", timeout),
-		)
+// shutdownServers drains both servers within one shared deadline. There is no
+// outer task timer that can return while Shutdown is still executing.
+func shutdownServers(pair *servers.Pair, timeout time.Duration) error {
+	if pair == nil {
+		return nil
 	}
-
-	// Create a context with the specified timeout to control the shutdown process
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-
-	// Attempt to shut down the server gracefully
-	if err := srv.Shutdown(ctx); err != nil {
-		// Log an error if the server fails to shut down
-		if resource.LoggerService != nil {
-			resource.LoggerService.Error("Server shutdown failed",
-				zap.String("server", name),
-				zap.Error(err),
-			)
-		} else {
-			// Fallback to standard log if logger is not available
-			log.Printf("❌ Server shutdown failed (%s): %v", name, err)
+	results := make(chan error, 2)
+	var wg sync.WaitGroup
+	for name, srv := range map[string]*http.Server{"main": pair.Main, "admin": pair.Admin} {
+		if srv == nil {
+			continue
 		}
-	} else {
-		// Log a success message if the server stops successfully
-		if resource.LoggerService != nil {
-			resource.LoggerService.Info("🛑 Server stopped successfully",
-				zap.String("server", name))
-		} else {
-			// Fallback to standard log if logger is not available
-			log.Printf("🛑 Server stopped successfully: %s", name)
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := srv.Shutdown(ctx); err != nil {
+				closeErr := srv.Close()
+				results <- fmt.Errorf("%s server shutdown: %w", name, errors.Join(err, closeErr))
+			}
+		}()
 	}
+	wg.Wait()
+	close(results)
+	var errs []error
+	for err := range results {
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
 }
 
-// cleanupResourcesWithTimeout performs resource cleanup with a specified timeout.
-//
-// It creates a context with the given timeout to ensure that the cleanup
-// process does not exceed the allocated time limit. The function attempts
-// to release all resources used by the application and logs the outcome.
-//
-// Parameters:
-//   - timeout: The maximum duration allowed for the cleanup process.
-func cleanupResourcesWithTimeout(timeout time.Duration) {
-	// Create a context with the specified timeout for the cleanup operation
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	// Attempt to close and cleanup all resources
-	if err := bootstrap.Close(ctx); err != nil {
-		// Log an error message if the cleanup fails
-		log.Printf("❌ Resource cleanup failed: %v", err)
-	} else {
-		// Log a success message if the cleanup completes successfully
-		log.Println("✅ Resource cleanup completed successfully")
+// startBackgroundTasks returns a stop function that waits for both workers,
+// ensuring neither can access resources after cleanup starts.
+func startBackgroundTasks(parent context.Context, startTime time.Time, version string, logger *zap.Logger) func() {
+	ctx, cancel := context.WithCancel(parent)
+	var wg sync.WaitGroup
+	startWorker := func(interval time.Duration, update func()) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					update()
+				}
+			}
+		}()
 	}
-}
-
-// handlePanic is a panic handler that logs the panic error and stack trace.
-//
-// When a panic occurs, this function is called with the panic value as an argument.
-// The function logs the panic error and stack trace using the configured logger
-// service. If the logger service is not available, it falls back to the standard
-// logger.
-//
-// Parameters:
-//   - r: The panic value passed to the panic handler.
-func handlePanic(r interface{}) {
-	if resource.LoggerService != nil {
-		resource.LoggerService.Error("Application panic recovered",
-			zap.Any("panic", r),
-			zap.String("stack", string(debug.Stack())),
-		)
-	} else {
-		log.Printf("Application panic recovered: %v\n", r)
-		log.Printf("Stack trace: %s\n", string(debug.Stack()))
+	startWorker(5*time.Minute, func() {
+		var stats runtime.MemStats
+		runtime.ReadMemStats(&stats)
+		if stats.Alloc > 1024*1024*1024 {
+			runtime.GC()
+			logger.Info("Triggered manual GC due to high memory usage")
+		}
+	})
+	updateUptime := func() {
+		middleware.AppUptime.WithLabelValues(version).Set(time.Since(startTime).Seconds())
+	}
+	updateUptime()
+	startWorker(30*time.Second, updateUptime)
+	return func() {
+		cancel()
+		wg.Wait()
 	}
 }
