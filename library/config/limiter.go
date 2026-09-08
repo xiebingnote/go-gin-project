@@ -10,6 +10,12 @@ var (
 	// PublicRate 公共API限流规则（按IP）
 	PublicRate = limiter.Rate{
 		Period: 1 * time.Minute,
+		Limit:  50,
+	}
+
+	// APIRate 业务API限流规则（按IP）
+	APIRate = limiter.Rate{
+		Period: time.Minute,
 		Limit:  100,
 	}
 
@@ -21,7 +27,7 @@ var (
 
 	// LoginRate 敏感端点限流（登录尝试）
 	LoginRate = limiter.Rate{
-		Period: 5 * time.Minute,
+		Period: 1 * time.Minute,
 		Limit:  10,
 	}
 )

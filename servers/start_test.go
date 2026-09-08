@@ -3,16 +3,19 @@ package servers
 import (
 	"context"
 	"errors"
+	"go.uber.org/zap"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/gin-gonic/gin"
 	"github.com/xiebingnote/go-gin-project/library/config"
+	"github.com/xiebingnote/go-gin-project/library/resource"
 )
 
 func TestAdminHandlerFeatureFlags(t *testing.T) {
@@ -164,5 +167,64 @@ func TestRunServerReturnsDelayedListenError(t *testing.T) {
 	close(fail)
 	if err := <-result; !errors.Is(err, want) {
 		t.Fatalf("serve error=%v, want=%v", err, want)
+	}
+}
+
+func TestStartupInstallsCircuitBreakerBeforeServing(t *testing.T) {
+	previousConfig, previousStarRocks := config.ServerConfig, config.StarRocksConfig
+	previousLogger, previousMode := resource.LoggerService, gin.Mode()
+	t.Cleanup(func() {
+		config.ServerConfig, config.StarRocksConfig = previousConfig, previousStarRocks
+		resource.LoggerService = previousLogger
+		gin.SetMode(previousMode)
+	})
+	resource.LoggerService = zap.NewNop()
+	config.ServerConfig = &config.ServerConfigEntry{Options: config.ServerOptions{
+		Mode: gin.TestMode, AuthType: "jwt",
+		ReadTimeout: time.Second, WriteTimeout: time.Second, ShutdownTimeout: time.Second,
+	}}
+	config.ServerConfig.HTTPServer.Listen = "127.0.0.1:0"
+	config.ServerConfig.AdminServer.Listen = "127.0.0.1:0"
+	// An absent controller dependency triggers Recovery without contacting any
+	// external service. The breaker must count these panics as business failures.
+	config.StarRocksConfig = nil
+	pair, err := Start(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		pair.Main.Close()
+		pair.Admin.Close()
+		for err := range pair.Errors {
+			t.Errorf("unexpected serve error: %v", err)
+		}
+	})
+	const failingPath = "/web/api/v1/flink/cdc/list"
+	for i := 0; i < 21; i++ {
+		rec := httptest.NewRecorder()
+		pair.Main.Handler.ServeHTTP(rec, httptest.NewRequest("GET", failingPath, nil))
+		want := 500
+		if i == 20 {
+			want = 503
+			if !strings.Contains(rec.Body.String(), "CIRCUIT_BREAKER_OPEN") {
+				t.Fatalf("expected a circuit-breaker rejection: %s", rec.Body)
+			}
+		}
+		if rec.Code != want {
+			t.Fatalf("request %d: status=%d want=%d body=%s", i+1, rec.Code, want, rec.Body)
+		}
+	}
+	// A failure on one route must not block another route or the admin server.
+	rec := httptest.NewRecorder()
+	pair.Main.Handler.ServeHTTP(rec, httptest.NewRequest("POST", "/web/api/v1/flink/cdc", strings.NewReader("{")))
+	if rec.Code != 400 {
+		t.Fatalf("unrelated route status=%d want=400", rec.Code)
+	}
+	rec = httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "127.0.0.1:12345"
+	pair.Admin.Handler.ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("admin endpoint status=%d want=200", rec.Code)
 	}
 }

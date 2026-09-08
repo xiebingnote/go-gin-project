@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -83,7 +84,17 @@ func PrometheusMiddleware() gin.HandlerFunc {
 
 		// Record the request metrics
 		duration := time.Since(start).Seconds()
-		httpRequestsTotal.WithLabelValues(c.Request.Method, c.FullPath()).Inc()
-		httpRequestDuration.WithLabelValues(c.Request.Method, c.FullPath()).Observe(duration)
+		httpRequestsTotal.WithLabelValues(normalizeHTTPMethod(c.Request.Method), c.FullPath()).Inc()
+		httpRequestDuration.WithLabelValues(normalizeHTTPMethod(c.Request.Method), c.FullPath()).Observe(duration)
+	}
+}
+
+// Unknown methods share one label to keep client-controlled metric cardinality bounded.
+func normalizeHTTPMethod(method string) string {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodConnect, http.MethodOptions, http.MethodTrace, http.MethodPatch:
+		return method
+	default:
+		return "OTHER"
 	}
 }

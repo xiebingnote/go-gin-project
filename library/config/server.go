@@ -38,6 +38,10 @@ type ServerOptions struct {
 	EnableSecurity  bool                   `toml:"EnableSecurity"` // 是否启用安全头
 	RateLimitConfig *ServerRateLimitConfig `toml:"RateLimit"`      // 限流配置
 
+	// CORS 来源白名单；不允许通配符或 null，凭据共享默认关闭。
+	CORSAllowedOrigins   []string `toml:"CORSAllowedOrigins"`
+	CORSAllowCredentials bool     `toml:"CORSAllowCredentials"`
+
 	// 认证配置
 	AuthType   string `toml:"AuthType"`   // 认证类型: jwt, casbin
 	EnableAuth bool   `toml:"EnableAuth"` // 是否启用认证

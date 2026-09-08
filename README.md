@@ -11,6 +11,22 @@
 - `Options.EnablePprof = false` 时不注册调试接口；`Options.EnableMetrics = false` 时不注册 `/metrics`。需要跨主机访问时，使用 SSH 隧道或带认证和访问限制的本机反向代理。
 - 收到 `SIGINT` 或 `SIGTERM` 后，先停止并等待后台监控任务，再等待两个 HTTP 服务关闭，最后清理共享资源。HTTP 关闭共用 10 秒期限，资源清理使用独立的 15 秒 context；资源关闭函数需遵守该 context。
 - HTTP 关闭超时时会强制关闭连接、保留可能仍被请求使用的共享资源，并以非零状态退出。初始化 panic、启动失败和资源清理错误同样返回非零状态。
+- `servers/httpserver/server.go` 在创建每个 HTTP 服务时初始化一个共享熔断器管理器，通过 `CustomCircuitBreakerMiddleware` 挂载到 `/web/api` 业务路由，位于鉴权、限流之后，业务路由注册之前。所有服务创建入口均经过这一步，实例间不共享熔断状态。每个 HTTP 方法和路由模板独立统计：默认 60 秒窗口内至少 20 次请求且失败率达到 60% 时熔断，拒绝后续请求并返回 503；30 秒后进入半开状态，最多接受 10 个探测请求。业务 5xx 和 panic 计为失败，4xx 不计为失败。登录、注册和管理接口不经过该熔断器；参数可在 `setupAPIMiddleware` 调用处通过 `CircuitBreakerConfig` 调整。
+
+### 认证、跨域与限流配置
+
+- 启用 `Options.EnableAuth` 前，通过部署环境的 `JWT_SECRET` 提供至少 32 字节、首尾无空白的随机密钥；可用 `openssl rand -hex 32` 生成后存入部署密钥管理系统。所有实例使用同一密钥，不要提交到仓库。密钥缺失或不合格会阻止认证服务启动；轮换密钥后，旧令牌失效，用户需重新登录。独立调用中间件时须先执行 `middleware.LoadJWTSecretFromEnv()`。
+- JWT 和 Casbin 都只接受 HS256、包含有效过期时间和正整数用户 ID 的令牌；Casbin 还要求有效角色。Casbin 模式必须先初始化 `resource.Enforcer` 并配置角色、路径、HTTP 方法策略，无匹配策略返回 403。启动不再写入示例权限或为 `alice` 授予管理员角色；升级时请检查并按需删除数据库中已有的示例授权。公开注册仅创建 `user`，管理员角色需通过受控流程分配。
+- 启用 `EnableSecurity` 和 `EnableCORS` 时，`CORSAllowedOrigins` 使用精确来源（如 `["https://console.example.com"]`，不带路径），不接受 `*` 或 `null`。空列表拒绝所有跨域来源；无 Origin 或直接连接的同源请求不受影响。TLS 在反向代理终止时，应显式列入浏览器使用的公网来源。`CORSAllowCredentials` 默认为 `false`，仅按需启用。
+- `Options.RateLimit` 的 `LoginLimit`、`APILimit`、`PublicLimit` 均为每个 IP 每分钟次数，默认分别为 10、100、50；0 使用默认值，负数配置会被拒绝。登录始终有限流保护；API 限流由 `EnableRedis` 或 `EnableMemory` 启用，与认证开关独立。启用安全中间件时，公共限流同时覆盖登录和业务请求，因此可能先达到公共限额。`UserIDLimiter` 为每个用户持续累计独立计数。
+- Redis 未初始化时使用每个进程独立的内存计数，不能提供跨实例总额；Redis 运行中失败返回 503。登录、API 和公共 Redis 计数使用不同键前缀，互不混用。
+- 监控将未知 HTTP 方法合并为 `OTHER`；熔断器按已注册路由模板复用，未知路径不创建熔断器，避免客户端输入无限增加指标和内存占用。
+
+相关回归测试（无需外部数据库或 Redis）：
+
+```sh
+go test -race -count=1 -timeout=90s . ./servers ./servers/httpserver ./library/middleware ./pkg/circuitbreaker
+```
 
 ### 1、集成组件：
 

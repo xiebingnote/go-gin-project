@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,6 +15,7 @@ import (
 
 // CircuitBreakerManager 熔断器管理器
 type CircuitBreakerManager struct {
+	mu       sync.RWMutex
 	breakers map[string]*circuitbreaker.CircuitBreaker
 	logger   *zap.Logger
 }
@@ -28,6 +30,8 @@ func NewCircuitBreakerManager(logger *zap.Logger) *CircuitBreakerManager {
 
 // GetOrCreateBreaker 获取或创建熔断器
 func (cbm *CircuitBreakerManager) GetOrCreateBreaker(name string, config circuitbreaker.Config) *circuitbreaker.CircuitBreaker {
+	cbm.mu.Lock()
+	defer cbm.mu.Unlock()
 	if cb, exists := cbm.breakers[name]; exists {
 		return cb
 	}
@@ -66,11 +70,15 @@ func (cbm *CircuitBreakerManager) onStateChange(name string, from circuitbreaker
 
 // GetBreaker 获取熔断器
 func (cbm *CircuitBreakerManager) GetBreaker(name string) *circuitbreaker.CircuitBreaker {
+	cbm.mu.RLock()
+	defer cbm.mu.RUnlock()
 	return cbm.breakers[name]
 }
 
 // ListBreakers 列出所有熔断器
 func (cbm *CircuitBreakerManager) ListBreakers() map[string]*circuitbreaker.CircuitBreaker {
+	cbm.mu.RLock()
+	defer cbm.mu.RUnlock()
 	result := make(map[string]*circuitbreaker.CircuitBreaker)
 	for name, cb := range cbm.breakers {
 		result[name] = cb
@@ -83,16 +91,20 @@ func CircuitBreakerMiddleware(manager *CircuitBreakerManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 根据路由生成熔断器名称
 		breakerName := generateBreakerName(c)
-		
+		if breakerName == "" {
+			c.Next()
+			return
+		}
+
 		// 获取或创建熔断器
 		cb := manager.GetOrCreateBreaker(breakerName, circuitbreaker.Config{
-			MaxRequests: 10,                // 半开状态下允许的最大请求数
-			Interval:    60 * time.Second,  // 统计窗口时间
-			Timeout:     30 * time.Second,  // 熔断器开启后的超时时间
+			MaxRequests: 10,               // 半开状态下允许的最大请求数
+			Interval:    60 * time.Second, // 统计窗口时间
+			Timeout:     30 * time.Second, // 熔断器开启后的超时时间
 			ReadyToTrip: func(counts circuitbreaker.Counts) bool {
 				// 当请求数 >= 20 且失败率 >= 60% 时熔断
-				return counts.Requests >= 20 && 
-					   float64(counts.TotalFailures)/float64(counts.Requests) >= 0.6
+				return counts.Requests >= 20 &&
+					float64(counts.TotalFailures)/float64(counts.Requests) >= 0.6
 			},
 			IsSuccessful: func(err error) bool {
 				// 根据 HTTP 状态码判断是否成功
@@ -103,12 +115,12 @@ func CircuitBreakerMiddleware(manager *CircuitBreakerManager) gin.HandlerFunc {
 		// 执行请求
 		_, err := cb.ExecuteWithContext(c.Request.Context(), func(ctx context.Context) (interface{}, error) {
 			c.Next()
-			
+
 			// 检查响应状态码
 			if c.Writer.Status() >= 500 {
 				return nil, &HTTPError{StatusCode: c.Writer.Status()}
 			}
-			
+
 			return nil, nil
 		})
 
@@ -144,19 +156,14 @@ func (e *HTTPError) Error() string {
 	return "HTTP " + strconv.Itoa(e.StatusCode)
 }
 
-// generateBreakerName 生成熔断器名称
+// generateBreakerName uses registered route templates only. Unknown paths do not
+// allocate breakers or their metric series.
 func generateBreakerName(c *gin.Context) string {
-	// 使用方法和路径生成名称
-	method := c.Request.Method
 	path := c.FullPath()
 	if path == "" {
-		path = c.Request.URL.Path
+		return ""
 	}
-	
-	// 清理路径中的参数
-	path = cleanPath(path)
-	
-	return method + ":" + path
+	return normalizeHTTPMethod(c.Request.Method) + ":" + cleanPath(path)
 }
 
 // cleanPath 清理路径
@@ -165,7 +172,7 @@ func cleanPath(path string) string {
 	if idx := strings.Index(path, "?"); idx != -1 {
 		path = path[:idx]
 	}
-	
+
 	// 替换路径参数为占位符
 	parts := strings.Split(path, "/")
 	for i, part := range parts {
@@ -173,7 +180,7 @@ func cleanPath(path string) string {
 			parts[i] = "{id}"
 		}
 	}
-	
+
 	return strings.Join(parts, "/")
 }
 
@@ -207,14 +214,18 @@ func CustomCircuitBreakerMiddleware(manager *CircuitBreakerManager, config Circu
 
 	return func(c *gin.Context) {
 		breakerName := generateBreakerName(c)
-		
+		if breakerName == "" {
+			c.Next()
+			return
+		}
+
 		cb := manager.GetOrCreateBreaker(breakerName, circuitbreaker.Config{
 			MaxRequests: config.MaxRequests,
 			Interval:    config.Interval,
 			Timeout:     config.Timeout,
 			ReadyToTrip: func(counts circuitbreaker.Counts) bool {
-				return counts.Requests >= config.MinRequests && 
-					   float64(counts.TotalFailures)/float64(counts.Requests) >= config.FailureRate
+				return counts.Requests >= config.MinRequests &&
+					float64(counts.TotalFailures)/float64(counts.Requests) >= config.FailureRate
 			},
 			IsSuccessful: func(err error) bool {
 				return err == nil
@@ -223,11 +234,11 @@ func CustomCircuitBreakerMiddleware(manager *CircuitBreakerManager, config Circu
 
 		_, err := cb.ExecuteWithContext(c.Request.Context(), func(ctx context.Context) (interface{}, error) {
 			c.Next()
-			
+
 			if c.Writer.Status() >= 500 {
 				return nil, &HTTPError{StatusCode: c.Writer.Status()}
 			}
-			
+
 			return nil, nil
 		})
 
@@ -260,16 +271,16 @@ func CircuitBreakerStatusHandler(manager *CircuitBreakerManager) gin.HandlerFunc
 	return func(c *gin.Context) {
 		breakers := manager.ListBreakers()
 		status := make(map[string]interface{})
-		
+
 		for name, cb := range breakers {
 			counts := cb.Counts()
 			state := cb.State()
-			
+
 			var failureRate float64
 			if counts.Requests > 0 {
 				failureRate = float64(counts.TotalFailures) / float64(counts.Requests)
 			}
-			
+
 			status[name] = gin.H{
 				"state":                 state.String(),
 				"requests":              counts.Requests,
@@ -280,7 +291,7 @@ func CircuitBreakerStatusHandler(manager *CircuitBreakerManager) gin.HandlerFunc
 				"failure_rate":          failureRate,
 			}
 		}
-		
+
 		c.JSON(http.StatusOK, gin.H{
 			"circuit_breakers": status,
 			"timestamp":        time.Now().Unix(),

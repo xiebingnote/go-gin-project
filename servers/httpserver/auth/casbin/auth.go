@@ -2,7 +2,6 @@ package casbin
 
 import (
 	"fmt"
-	"golang.org/x/crypto/bcrypt"
 	"net/http"
 
 	"github.com/xiebingnote/go-gin-project/library/middleware"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Register handles user registration by accepting a JSON request with a username, password, and role,
@@ -49,6 +49,13 @@ func Register(c *gin.Context) {
 		// Return an error response if the username or password is empty
 		resource.LoggerService.Error(fmt.Sprintf("Registration failed: Username and password are required"))
 		resp.NewErrResp(c, http.StatusBadRequest, "Registration failed: Username and password are required", reqID)
+		return
+	}
+
+	// Public registration cannot grant privileged or custom roles.
+	if req.Role != "" && req.Role != "user" {
+		resp.NewErrResp(c, http.StatusBadRequest, "Role cannot be selected during registration", reqID)
+		return
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -62,7 +69,7 @@ func Register(c *gin.Context) {
 	user := types.TbUser{
 		Username: req.Username,
 		Password: string(hashedPassword),
-		Role:     req.Role,
+		Role:     "user",
 	}
 
 	// Insert the user into the database

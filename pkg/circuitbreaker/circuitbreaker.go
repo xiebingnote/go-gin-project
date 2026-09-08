@@ -145,6 +145,8 @@ func NewCircuitBreaker(cfg Config) *CircuitBreaker {
 
 // SetLogger 设置日志记录器
 func (cb *CircuitBreaker) SetLogger(logger *zap.Logger) {
+	cb.mutex.Lock()
+	defer cb.mutex.Unlock()
 	cb.logger = logger
 }
 
@@ -152,7 +154,7 @@ func (cb *CircuitBreaker) SetLogger(logger *zap.Logger) {
 func (cb *CircuitBreaker) Execute(req func() (interface{}, error)) (interface{}, error) {
 	generation, err := cb.beforeRequest()
 	if err != nil {
-		circuitBreakerRequests.WithLabelValues(cb.name, cb.state.String(), "rejected").Inc()
+		circuitBreakerRequests.WithLabelValues(cb.name, cb.State().String(), "rejected").Inc()
 		return nil, err
 	}
 
@@ -169,9 +171,9 @@ func (cb *CircuitBreaker) Execute(req func() (interface{}, error)) (interface{},
 
 	// 记录指标
 	if err != nil {
-		circuitBreakerRequests.WithLabelValues(cb.name, cb.state.String(), "failure").Inc()
+		circuitBreakerRequests.WithLabelValues(cb.name, cb.State().String(), "failure").Inc()
 	} else {
-		circuitBreakerRequests.WithLabelValues(cb.name, cb.state.String(), "success").Inc()
+		circuitBreakerRequests.WithLabelValues(cb.name, cb.State().String(), "success").Inc()
 	}
 
 	return result, err
@@ -181,7 +183,7 @@ func (cb *CircuitBreaker) Execute(req func() (interface{}, error)) (interface{},
 func (cb *CircuitBreaker) ExecuteWithContext(ctx context.Context, req func(ctx context.Context) (interface{}, error)) (interface{}, error) {
 	generation, err := cb.beforeRequest()
 	if err != nil {
-		circuitBreakerRequests.WithLabelValues(cb.name, cb.state.String(), "rejected").Inc()
+		circuitBreakerRequests.WithLabelValues(cb.name, cb.State().String(), "rejected").Inc()
 		return nil, err
 	}
 
@@ -198,9 +200,9 @@ func (cb *CircuitBreaker) ExecuteWithContext(ctx context.Context, req func(ctx c
 
 	// 记录指标
 	if err != nil {
-		circuitBreakerRequests.WithLabelValues(cb.name, cb.state.String(), "failure").Inc()
+		circuitBreakerRequests.WithLabelValues(cb.name, cb.State().String(), "failure").Inc()
 	} else {
-		circuitBreakerRequests.WithLabelValues(cb.name, cb.state.String(), "success").Inc()
+		circuitBreakerRequests.WithLabelValues(cb.name, cb.State().String(), "success").Inc()
 	}
 
 	return result, err

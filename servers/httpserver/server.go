@@ -3,6 +3,7 @@ package httpserver
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/xiebingnote/go-gin-project/library/config"
 	"github.com/xiebingnote/go-gin-project/library/middleware"
@@ -11,6 +12,7 @@ import (
 	"github.com/xiebingnote/go-gin-project/servers/httpserver/auth/jwt"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ulule/limiter/v3"
 	"go.uber.org/zap"
 )
 
@@ -28,35 +30,24 @@ type ServerRateLimitConfig = config.ServerRateLimitConfig
 // Returns:
 //   - *ServerOptions:  a pointer to the default server options
 func DefaultServerOptions() *ServerOptions {
-	//return config.DefaultServerOptions()
-	return &ServerOptions{
-		Mode:            config.ServerConfig.Options.Mode,
-		EnablePprof:     config.ServerConfig.Options.EnablePprof,
-		EnableMetrics:   config.ServerConfig.Options.EnableMetrics,
-		TrustedProxies:  config.ServerConfig.Options.TrustedProxies,
-		EnableCORS:      config.ServerConfig.Options.EnableCORS,
-		EnableSecurity:  config.ServerConfig.Options.EnableSecurity,
-		AuthType:        config.ServerConfig.Options.AuthType,
-		EnableAuth:      config.ServerConfig.Options.EnableAuth,
-		ReadTimeout:     config.ServerConfig.Options.ReadTimeout,
-		WriteTimeout:    config.ServerConfig.Options.WriteTimeout,
-		IdleTimeout:     config.ServerConfig.Options.IdleTimeout,
-		ShutdownTimeout: config.ServerConfig.Options.ShutdownTimeout,
-		RateLimitConfig: &ServerRateLimitConfig{
-			EnableRedis:  config.ServerConfig.Options.RateLimitConfig.EnableRedis,
-			EnableMemory: config.ServerConfig.Options.RateLimitConfig.EnableMemory,
-			LoginLimit:   config.ServerConfig.Options.RateLimitConfig.LoginLimit,
-			APILimit:     config.ServerConfig.Options.RateLimitConfig.APILimit,
-			PublicLimit:  config.ServerConfig.Options.RateLimitConfig.PublicLimit,
-		},
+	if config.ServerConfig == nil {
+		panic("server configuration is not initialized")
 	}
+	opts := config.ServerConfig.Options
+	opts.TrustedProxies = append([]string(nil), opts.TrustedProxies...)
+	opts.CORSAllowedOrigins = append([]string(nil), opts.CORSAllowedOrigins...)
+	if opts.RateLimitConfig != nil {
+		limits := *opts.RateLimitConfig
+		opts.RateLimitConfig = &limits
+	}
+	return &opts
 }
 
 // NewServer creates a new HTTP server instance
 //
 // This function creates a new HTTP server with the default configuration.
-// The server is configured with JWT authentication, rate limiting, and
-// monitoring. If you need to customize the configuration, you can use
+// The server is configured with JWT authentication, rate limiting, circuit
+// breaking, and monitoring. If you need to customize the configuration, you can use
 // NewServerWithOptions instead.
 //
 // Returns:
@@ -83,6 +74,15 @@ func NewServerWithOptions(opts *ServerOptions) *gin.Engine {
 			resource.LoggerService.Error("Invalid server options", zap.Error(err))
 		}
 		panic(fmt.Sprintf("Invalid server options: %v", err))
+	}
+
+	if opts.EnableAuth {
+		if err := middleware.LoadJWTSecretFromEnv(); err != nil {
+			panic(err)
+		}
+		if opts.AuthType == "casbin" && resource.Enforcer == nil {
+			panic("Casbin enforcer must be initialized before serving authenticated routes")
+		}
 	}
 
 	// Set Gin mode
@@ -148,6 +148,18 @@ func NewServerWithOptions(opts *ServerOptions) *gin.Engine {
 // Returns:
 //   - error: An error if any of the options are invalid, otherwise nil.
 func Validate(opts *ServerOptions) error {
+	if opts == nil {
+		return fmt.Errorf("server options are required")
+	}
+	if opts.EnableCORS {
+		if err := middleware.ValidateCORSOrigins(opts.CORSAllowedOrigins); err != nil {
+			return err
+		}
+	}
+	if limits := opts.RateLimitConfig; limits != nil && (limits.LoginLimit < 0 || limits.APILimit < 0 || limits.PublicLimit < 0) {
+		return fmt.Errorf("rate limits must not be negative")
+	}
+
 	// Check if the mode is valid
 	if opts.Mode != gin.DebugMode && opts.Mode != gin.ReleaseMode && opts.Mode != gin.TestMode {
 		return fmt.Errorf("invalid gin mode: %s", opts.Mode)
@@ -224,7 +236,7 @@ func setupBaseMiddleware(router *gin.Engine) {
 func setupSecurityMiddleware(router *gin.Engine, opts *ServerOptions) {
 	// Enable CORS if configured
 	if opts.EnableCORS {
-		router.Use(middleware.CORSMiddleware())
+		router.Use(middleware.CORSMiddleware(opts.CORSAllowedOrigins, opts.CORSAllowCredentials))
 	}
 
 	// Set up security headers for all requests
@@ -234,10 +246,10 @@ func setupSecurityMiddleware(router *gin.Engine, opts *ServerOptions) {
 	if opts.RateLimitConfig != nil {
 		// Use Redis for rate limiting if configured and Redis is available
 		if opts.RateLimitConfig.EnableRedis && resource.RedisClient != nil {
-			router.Use(middleware.RedisLimiter(config.PublicRate))
-		} else if opts.RateLimitConfig.EnableMemory {
+			router.Use(middleware.RedisLimiter(publicRate(opts)))
+		} else if opts.RateLimitConfig.EnableMemory || opts.RateLimitConfig.EnableRedis {
 			// Use in-memory rate limiting if Redis is not available
-			router.Use(middleware.MemoryLimiter(config.PublicRate))
+			router.Use(middleware.MemoryLimiter(publicRate(opts)))
 		}
 	}
 }
@@ -247,126 +259,83 @@ func setupSecurityMiddleware(router *gin.Engine, opts *ServerOptions) {
 // The function configures routes for login and registration endpoints using either JWT or Casbin authentication.
 // It also applies rate limiting based on the configuration provided in ServerOptions.
 func setupAuthRoutes(router *gin.Engine, opts *ServerOptions) {
-	// Return early if authentication is not enabled
 	if !opts.EnableAuth {
 		return
 	}
-
-	// Determine the authentication type and set up routes accordingly
+	loginLimiter := middleware.MemoryLimiter(loginRate(opts))
+	if opts.RateLimitConfig != nil && opts.RateLimitConfig.EnableRedis && resource.RedisClient != nil {
+		loginLimiter = middleware.LoginRateLimiter(loginRate(opts))
+	}
 	switch opts.AuthType {
 	case "jwt":
-		// Set up JWT authentication routes
-		// Apply in-memory rate limiting by default
-		loginLimiter := middleware.MemoryLimiter(config.LoginRate)
-
-		// Use Redis for rate limiting if configured and Redis is available
-		if opts.RateLimitConfig != nil && opts.RateLimitConfig.EnableRedis && resource.RedisClient != nil {
-			loginLimiter = middleware.LoginRateLimiter()
-		}
-
-		// Register login and register routes using JWT handlers
 		router.POST("/web/api/login", loginLimiter, jwt.Login)
 		router.POST("/web/api/register", jwt.Register)
-
 	case "casbin":
-		// Set up Casbin authentication routes
-		setupCasbinPolicies()
-
-		// Register login and register routes using Casbin handlers with rate limiting
-		router.POST("/web/api/v1/login", middleware.LoginRateLimiter(), authcasbin.Login)
+		router.POST("/web/api/v1/login", loginLimiter, authcasbin.Login)
 		router.POST("/web/api/v1/register", authcasbin.Register)
 	}
 }
 
 // setupAPIMiddleware sets up the middleware for the API routes.
 //
-// This function configures authentication and rate limiting middleware
-// for the API route group based on the server options provided.
+// This function configures authentication, rate limiting, and circuit breaking
+// before business routes are registered. Each server owns one breaker manager.
 //
 // Parameters:
 //   - api: The API route group to which middleware is applied.
 //   - opts: The server configuration options.
 func setupAPIMiddleware(api *gin.RouterGroup, opts *ServerOptions) {
-	// Return early if authentication is not enabled
-	if !opts.EnableAuth {
-		return
-	}
-
 	// Apply authentication middleware based on the configured authentication type
-	switch opts.AuthType {
-	case "jwt":
-		// Use JWT authentication middleware
-		api.Use(middleware.AuthMiddlewareJWT)
-	case "casbin":
-		// Use Casbin authentication middleware
-		api.Use(middleware.AuthMiddlewareCasbin())
+	if opts.EnableAuth {
+		switch opts.AuthType {
+		case "jwt":
+			api.Use(middleware.AuthMiddlewareJWT)
+		case "casbin":
+			api.Use(middleware.AuthMiddlewareCasbin(), middleware.CasbinMiddleware(resource.Enforcer))
+		}
 	}
 
 	// Apply rate limiting middleware if configured
 	if opts.RateLimitConfig != nil {
 		if opts.RateLimitConfig.EnableRedis && resource.RedisClient != nil {
 			// Use Redis-based rate limiting
-			api.Use(middleware.APIRateLimiter())
-		} else if opts.RateLimitConfig.EnableMemory {
+			api.Use(middleware.APIRateLimiter(apiRate(opts)))
+		} else if opts.RateLimitConfig.EnableMemory || opts.RateLimitConfig.EnableRedis {
 			// Use in-memory rate limiting
-			api.Use(middleware.MemoryLimiter(config.PublicRate))
+			api.Use(middleware.MemoryLimiter(apiRate(opts)))
 		}
 	}
+
+	// Reuse one manager across this server's business routes. Authentication and
+	// rate-limit rejections must finish before requests enter circuit statistics.
+	manager := middleware.NewCircuitBreakerManager(resource.LoggerService)
+	api.Use(middleware.CustomCircuitBreakerMiddleware(manager, middleware.DefaultCircuitBreakerConfig))
 }
 
-// setupCasbinPolicies sets up the default Casbin policies and grouping policies.
-//
-// This function configures the default access control policies for different roles
-// and adds specific users to role groups. If the Casbin enforcer is not initialized,
-// the function exits early.
-func setupCasbinPolicies() {
-	// Return early if the Casbin enforcer is not initialized
-	if resource.Enforcer == nil {
-		return
+// Limit overrides use requests per minute, matching conf/server.toml.
+func loginRate(opts *ServerOptions) limiter.Rate {
+	if cfg := opts.RateLimitConfig; cfg != nil && cfg.LoginLimit > 0 {
+		return limiter.Rate{Period: time.Minute, Limit: int64(cfg.LoginLimit)}
 	}
-
-	// Define default policies for role-based access control
-	policies := [][]string{
-		// "admin" role has access to all routes and HTTP methods
-		{"admin", "/*", "*"},
-		// "user" role can perform GET requests on v1 endpoints
-		{"user", "/web/api/v1/*", "GET"},
-		// "user" role can perform any method on v1 endpoints
-		{"user", "/web/api/v1/*", "*"},
+	return config.LoginRate
+}
+func apiRate(opts *ServerOptions) limiter.Rate {
+	if cfg := opts.RateLimitConfig; cfg != nil && cfg.APILimit > 0 {
+		return limiter.Rate{Period: time.Minute, Limit: int64(cfg.APILimit)}
 	}
-
-	// Add each policy to the Casbin enforcer
-	for _, policy := range policies {
-		if _, err := resource.Enforcer.AddPolicy(policy); err != nil {
-			// Log an error if adding the policy fails
-			if resource.LoggerService != nil {
-				resource.LoggerService.Error("Failed to add Casbin policy",
-					zap.Strings("policy", policy),
-					zap.Error(err),
-				)
-			}
-		}
+	return config.APIRate
+}
+func publicRate(opts *ServerOptions) limiter.Rate {
+	if cfg := opts.RateLimitConfig; cfg != nil && cfg.PublicLimit > 0 {
+		return limiter.Rate{Period: time.Minute, Limit: int64(cfg.PublicLimit)}
 	}
-
-	// Add grouping policy to associate users with roles
-	if _, err := resource.Enforcer.AddGroupingPolicy("alice", "admin"); err != nil {
-		// Log an error if adding the grouping policy fails
-		if resource.LoggerService != nil {
-			resource.LoggerService.Error("Failed to add Casbin grouping policy", zap.Error(err))
-		}
-	}
+	return config.PublicRate
 }
 
 // NewServerCasbin creates an HTTP server with Casbin authorization enabled.
 //
-// Casbin is used for role-based access control (RBAC). The default policies
-// are set up to manage access control for different roles. The function also
-// creates a configured Gin engine instance.
-//
-// Default policies:
-//   - "admin" role has access to all routes and HTTP methods
-//   - "user" role can perform GET requests on v1 endpoints and any method
-//   - "alice" user is grouped into the "admin" role
+// Casbin policies must be provisioned before serving traffic. No sample policies
+// or privileged role assignments are added automatically.
 //
 // Returns:
 //   - *gin.Engine: A configured Gin engine instance with Casbin authorization enabled.

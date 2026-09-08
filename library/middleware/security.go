@@ -1,54 +1,77 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-// CORSMiddleware adds CORS headers to responses.
-//
-// CORS (Cross-Origin Resource Sharing) is a mechanism that allows a web page to
-// make requests to a different origin (domain, protocol, or port) than the one
-// the web page was loaded from. This is useful for making API calls from a web
-// page to a server on a different domain.
-//
-// The middleware sets the following headers:
-//   - Access-Control-Allow-Origin: the value of the Origin header
-//   - Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH
-//   - Access-Control-Allow-Headers: Origin, Content-Type, Content-Length,
-//     Accept-Encoding, X-CSRF-Token, Authorization, accept, origin,
-//     Cache-Control, X-Requested-With
-//   - Access-Control-Allow-Credentials: true
-//   - Access-Control-Max-Age: 86400 (24 hours)
-//
-// The middleware also handles CORS preflight requests by responding with a 204
-// status code.
-//
-// See https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS for more
-// information.
-func CORSMiddleware() gin.HandlerFunc {
+// ValidateCORSOrigins accepts exact HTTP(S) origins, never wildcards or opaque origins.
+func ValidateCORSOrigins(origins []string) error {
+	for _, origin := range origins {
+		parsed, err := url.Parse(origin)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil ||
+			parsed.Path != "" || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" ||
+			strings.ContainsAny(origin, "* \t\r\n") {
+			return fmt.Errorf("invalid CORS origin %q: use an exact HTTP(S) origin without a path", origin)
+		}
+	}
+	return nil
+}
+
+// CORSMiddleware permits only explicitly configured origins. Requests without an
+// Origin header and same-origin requests are unaffected; credential sharing is opt-in.
+func CORSMiddleware(origins []string, allowCredentials bool) gin.HandlerFunc {
+	if err := ValidateCORSOrigins(origins); err != nil {
+		panic(err)
+	}
+	allowed := make(map[string]struct{}, len(origins))
+	for _, origin := range origins {
+		allowed[origin] = struct{}{}
+	}
 	return func(c *gin.Context) {
-		// Get the value of the Origin header. This is the domain that the
-		// request came from.
-		origin := c.Request.Header.Get("Origin")
-
-		// Set the CORS headers.
+		c.Writer.Header().Add("Vary", "Origin")
+		origin := c.GetHeader("Origin")
+		scheme := "http"
+		if c.Request.TLS != nil {
+			scheme = "https"
+		}
+		// Use the actual connection, not untrusted forwarded headers. Deployments
+		// behind TLS termination can explicitly allow their public origin.
+		if origin == "" || origin == scheme+"://"+c.Request.Host {
+			c.Next()
+			return
+		}
+		if _, ok := allowed[origin]; !ok {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Origin not allowed"})
+			return
+		}
+		preflight := c.Request.Method == http.MethodOptions && c.GetHeader("Access-Control-Request-Method") != ""
+		if preflight {
+			c.Writer.Header().Add("Vary", "Access-Control-Request-Method")
+			c.Writer.Header().Add("Vary", "Access-Control-Request-Headers")
+			switch c.GetHeader("Access-Control-Request-Method") {
+			case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions, http.MethodPatch:
+			default:
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
+		}
 		c.Header("Access-Control-Allow-Origin", origin)
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Header("Access-Control-Allow-Credentials", "true")
-		c.Header("Access-Control-Max-Age", "86400") // 24小时
-
-		// If the request method is OPTIONS, this is a CORS preflight request.
-		// Respond with a 204 status code.
-		if c.Request.Method == "OPTIONS" {
+		if allowCredentials {
+			c.Header("Access-Control-Allow-Credentials", "true")
+		}
+		if preflight {
+			c.Header("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, DELETE, OPTIONS, PATCH")
+			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Requested-With, X-Request-ID")
+			c.Header("Access-Control-Max-Age", "600")
 			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
-
-		// Continue with the request.
 		c.Next()
 	}
 }
