@@ -55,6 +55,7 @@ EnableMetrics = true
 
 # 信任的代理IP地址列表
 # 用于正确获取客户端真实IP地址
+# 空列表不信任任何代理；非法 IP 或 CIDR 将阻止服务启动
 TrustedProxies = ["127.0.0.1", "::1"]
 
 # 是否启用CORS跨域资源共享

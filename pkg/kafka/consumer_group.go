@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/xiebingnote/go-gin-project/library/common"
 	"github.com/xiebingnote/go-gin-project/library/resource"
@@ -13,14 +14,19 @@ import (
 
 // ExampleConsumerGroupHandler is a consumer group handler that implements
 type ExampleConsumerGroupHandler struct {
-	Ready chan bool
+	// Ready signals the first successful session and must not be replaced.
+	Ready     chan bool
+	readyOnce sync.Once
 }
 
 // Setup is run at the beginning of a new session, before ConsumeClaim.
 // It closes the Ready channel to signal that the consumer is ready.
 func (h *ExampleConsumerGroupHandler) Setup(sarama.ConsumerGroupSession) error {
-	// Close the Ready channel to indicate readiness
-	close(h.Ready)
+	if h.Ready == nil {
+		return fmt.Errorf("consumer ready channel is not initialized")
+	}
+	// Sarama calls Setup again after each rebalance using the same handler.
+	h.readyOnce.Do(func() { close(h.Ready) })
 	return nil
 }
 

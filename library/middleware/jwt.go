@@ -18,6 +18,8 @@ import (
 const (
 	TokenExpirationDuration = 24 * time.Hour
 	BearerPrefix            = "Bearer "
+	// MaxJWTTokenSize bounds parsing work for the compact, signed token.
+	MaxJWTTokenSize = 8 * 1024
 )
 
 type signingKey struct{ secret []byte }
@@ -45,6 +47,10 @@ func currentJWTKey() ([]byte, error) {
 }
 
 func bearerToken(header string) (string, error) {
+	// Check before Fields, which allocates a slice for whitespace-separated input.
+	if len(header) > len(BearerPrefix)+MaxJWTTokenSize {
+		return "", errors.New("Authorization header is too large")
+	}
 	fields := strings.Fields(header)
 	if len(fields) != 2 || !strings.EqualFold(fields[0], "Bearer") {
 		return "", errors.New("Authorization must contain a Bearer token")
@@ -114,6 +120,9 @@ func generateToken(userID uint, role string) (string, error) {
 
 // ParseToken applies the same algorithm, expiry and identity rules to all tokens.
 func ParseToken(tokenString string) (*jwt.Token, error) {
+	if len(tokenString) > MaxJWTTokenSize {
+		return nil, errors.New("JWT token is too large")
+	}
 	key, err := currentJWTKey()
 	if err != nil {
 		return nil, err

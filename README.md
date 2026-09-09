@@ -17,6 +17,8 @@
 
 - 启用 `Options.EnableAuth` 前，通过部署环境的 `JWT_SECRET` 提供至少 32 字节、首尾无空白的随机密钥；可用 `openssl rand -hex 32` 生成后存入部署密钥管理系统。所有实例使用同一密钥，不要提交到仓库。密钥缺失或不合格会阻止认证服务启动；轮换密钥后，旧令牌失效，用户需重新登录。独立调用中间件时须先执行 `middleware.LoadJWTSecretFromEnv()`。
 - JWT 和 Casbin 都只接受 HS256、包含有效过期时间和正整数用户 ID 的令牌；Casbin 还要求有效角色。Casbin 模式必须先初始化 `resource.Enforcer` 并配置角色、路径、HTTP 方法策略，无匹配策略返回 403。启动不再写入示例权限或为 `alice` 授予管理员角色；升级时请检查并按需删除数据库中已有的示例授权。公开注册仅创建 `user`，管理员角色需通过受控流程分配。
+- JWT 令牌最大为 8 KiB，`Authorization` 头最大为 8 KiB 加 `Bearer ` 前缀长度；在拆分和解析前检查大小，超限返回 401。`ParseToken` 直接调用也执行令牌大小检查。
+- `Options.TrustedProxies` 只接受代理 IP 或 CIDR，非法配置阻止启动。空列表（或省略）表示不信任任何代理，客户端 IP 取实际连接地址；仅当连接来自已配置的代理时才接受转发头。
 - 启用 `EnableSecurity` 和 `EnableCORS` 时，`CORSAllowedOrigins` 使用精确来源（如 `["https://console.example.com"]`，不带路径），不接受 `*` 或 `null`。空列表拒绝所有跨域来源；无 Origin 或直接连接的同源请求不受影响。TLS 在反向代理终止时，应显式列入浏览器使用的公网来源。`CORSAllowCredentials` 默认为 `false`，仅按需启用。
 - `Options.RateLimit` 的 `LoginLimit`、`APILimit`、`PublicLimit` 均为每个 IP 每分钟次数，默认分别为 10、100、50；0 使用默认值，负数配置会被拒绝。登录始终有限流保护；API 限流由 `EnableRedis` 或 `EnableMemory` 启用，与认证开关独立。启用安全中间件时，公共限流同时覆盖登录和业务请求，因此可能先达到公共限额。`UserIDLimiter` 为每个用户持续累计独立计数。
 - Redis 未初始化时使用每个进程独立的内存计数，不能提供跨实例总额；Redis 运行中失败返回 503。登录、API 和公共 Redis 计数使用不同键前缀，互不混用。
@@ -26,7 +28,10 @@
 
 ```sh
 go test -race -count=1 -timeout=90s . ./servers ./servers/httpserver ./library/middleware ./pkg/circuitbreaker
+go test -race pkg/kafka/consumer_group.go pkg/kafka/consumer_group_regression_test.go -timeout 30s
 ```
+
+Kafka 回归测试直接指定文件，避开原有集成测试中的自动连接；验证同一处理器重复建立消费会话时，就绪通道只关闭一次，无需实际 Kafka 集群。
 
 ### 1、集成组件：
 

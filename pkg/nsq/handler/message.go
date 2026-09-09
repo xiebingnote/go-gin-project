@@ -2,9 +2,11 @@ package handler
 
 import (
 	"fmt"
-	"github.com/nsqio/go-nsq"
+
 	"github.com/xiebingnote/go-gin-project/library/common"
 	pkgproto "github.com/xiebingnote/go-gin-project/pkg/proto"
+
+	"github.com/nsqio/go-nsq"
 )
 
 // HandleMessage deserializes the application message and performs its work.

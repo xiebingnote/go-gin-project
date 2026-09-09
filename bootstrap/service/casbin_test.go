@@ -4,7 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
+	"fmt"
+	"gorm.io/driver/mysql"
+	gormlogger "gorm.io/gorm/logger"
+	"io"
 	"os"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -175,7 +182,7 @@ func TestValidateCasbinDependencies(t *testing.T) {
 				defer tt.cleanupFunc()
 			}
 
-			err := validateCasbinDependencies()
+			err := validateCasbinDependencies(context.Background())
 
 			if tt.expectError {
 				if err == nil {
@@ -305,5 +312,224 @@ func TestInitCasbinEnforcer_WithValidSetup(t *testing.T) {
 	// Clean up
 	if resource.Enforcer != nil {
 		_ = CloseCasbin(ctx)
+	}
+}
+
+// The fake driver exercises the actual GORM adapter without a live database.
+type casbinInitConnector struct {
+	hook func(context.Context, string) error
+}
+
+func (c casbinInitConnector) Connect(context.Context) (driver.Conn, error) {
+	return &casbinInitConn{hook: c.hook}, nil
+}
+func (casbinInitConnector) Driver() driver.Driver { return nil }
+
+type casbinInitConn struct {
+	driver.Conn
+	hook func(context.Context, string) error
+}
+
+func (*casbinInitConn) Close() error { return nil }
+func (c *casbinInitConn) Ping(ctx context.Context) error {
+	return c.hook(ctx, "ping")
+}
+func (c *casbinInitConn) QueryContext(ctx context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
+	var stage string
+	var rows casbinInitRows
+	switch {
+	case query == "SELECT DATABASE()":
+		stage = "database"
+		rows = casbinInitRows{columns: []string{"database"}, values: [][]driver.Value{{"audit"}}}
+	case strings.Contains(query, "information_schema.tables"):
+		stage = "table"
+		rows = casbinInitRows{columns: []string{"count"}, values: [][]driver.Value{{int64(1)}}}
+	case strings.Contains(query, "`casbin_rule`"):
+		stage = "policy"
+		rows = casbinInitRows{columns: []string{"id", "p_type", "v0", "v1", "v2", "v3", "v4", "v5"}}
+	default:
+		return nil, fmt.Errorf("unexpected SQL query: %s", query)
+	}
+	if err := c.hook(ctx, stage); err != nil {
+		return nil, err
+	}
+	return &rows, nil
+}
+func (c *casbinInitConn) ExecContext(ctx context.Context, _ string, _ []driver.NamedValue) (driver.Result, error) {
+	if err := c.hook(ctx, "write"); err != nil {
+		return nil, err
+	}
+	return casbinInitResult{}, nil
+}
+
+type casbinInitResult struct{}
+
+func (casbinInitResult) LastInsertId() (int64, error) { return 1, nil }
+func (casbinInitResult) RowsAffected() (int64, error) { return 1, nil }
+
+type casbinInitRows struct {
+	columns []string
+	values  [][]driver.Value
+}
+
+func (r *casbinInitRows) Columns() []string { return r.columns }
+func (*casbinInitRows) Close() error        { return nil }
+func (r *casbinInitRows) Next(dest []driver.Value) error {
+	if len(r.values) == 0 {
+		return io.EOF
+	}
+	copy(dest, r.values[0])
+	r.values = r.values[1:]
+	return nil
+}
+
+func setupCasbinInitialization(t *testing.T, hook func(context.Context, string) error) *gorm.DB {
+	t.Helper()
+	regressionLogger(t)
+	previousDB, previousEnforcer := resource.MySQLClient, resource.Enforcer
+	t.Cleanup(func() { resource.MySQLClient, resource.Enforcer = previousDB, previousEnforcer })
+	t.Setenv("CASBIN_CONFIG_PATH", "../../conf/service/casbin.conf")
+	sqlDB := sql.OpenDB(casbinInitConnector{hook: hook})
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	db, err := gorm.Open(mysql.New(mysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}), &gorm.Config{
+		DisableAutomaticPing: true, SkipDefaultTransaction: true,
+		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resource.MySQLClient, resource.Enforcer = db, nil
+	return db
+}
+
+func TestCasbinInitializationAlreadyCanceled(t *testing.T) {
+	previousDB, previousLogger := resource.MySQLClient, resource.LoggerService
+	t.Cleanup(func() { resource.MySQLClient, resource.LoggerService = previousDB, previousLogger })
+	resource.MySQLClient, resource.LoggerService = nil, nil
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := InitCasbinEnforcer(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("initialization error=%v, want context.Canceled", err)
+	}
+	if _, err := createCasbinAdapter(ctx, nil); !errors.Is(err, context.Canceled) {
+		t.Fatalf("adapter error=%v, want context.Canceled", err)
+	}
+	if _, err := createCasbinEnforcer(ctx, nil); !errors.Is(err, context.Canceled) {
+		t.Fatalf("enforcer error=%v, want context.Canceled", err)
+	}
+}
+
+func TestCasbinInitializationWaitsForCanceledDatabaseWork(t *testing.T) {
+	for _, phase := range []string{"ping", "table", "policy"} {
+		t.Run(phase, func(t *testing.T) {
+			entered, canceled, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+			var releaseOnce sync.Once
+			unblock := func() { releaseOnce.Do(func() { close(release) }) }
+			setupCasbinInitialization(t, func(ctx context.Context, stage string) error {
+				if stage != phase {
+					return ctx.Err()
+				}
+				if _, ok := ctx.Deadline(); !ok {
+					t.Error("database operation has no initialization deadline")
+				}
+				close(entered)
+				select {
+				case <-ctx.Done():
+				case <-release:
+					return errors.New("test interrupted database operation")
+				}
+				close(canceled)
+				// Model a driver that needs time to finish after observing cancellation.
+				<-release
+				return ctx.Err()
+			})
+			ctx, cancel := context.WithCancel(context.Background())
+			result, finished := make(chan error, 1), make(chan struct{})
+			go func() {
+				defer close(finished)
+				result <- InitCasbinEnforcer(ctx)
+			}()
+			t.Cleanup(func() {
+				cancel()
+				unblock()
+				select {
+				case <-finished:
+				case <-time.After(2 * time.Second):
+					t.Error("initialization did not finish")
+				}
+			})
+			select {
+			case <-entered:
+			case err := <-result:
+				t.Fatalf("initialization returned before %s: %v", phase, err)
+			case <-time.After(2 * time.Second):
+				t.Fatal("database operation did not start")
+			}
+			cancel()
+			select {
+			case <-canceled:
+			case <-time.After(2 * time.Second):
+				t.Fatal("database operation did not receive cancellation")
+			}
+			select {
+			case err := <-result:
+				t.Fatalf("initialization returned with database work still active: %v", err)
+			case <-time.After(20 * time.Millisecond):
+			}
+			unblock()
+			select {
+			case err := <-result:
+				if !errors.Is(err, context.Canceled) {
+					t.Fatalf("error=%v, want context.Canceled", err)
+				}
+			case <-time.After(2 * time.Second):
+				t.Fatal("initialization did not return after database work finished")
+			}
+			if resource.Enforcer != nil {
+				t.Fatal("canceled initialization published an enforcer")
+			}
+			if err := CloseMySQLContext(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			if resource.MySQLClient != nil {
+				t.Fatal("database cleanup did not clear the shared client")
+			}
+		})
+	}
+}
+
+func TestCasbinRuntimePoliciesSurviveInitializationContextCancellation(t *testing.T) {
+	var policyCtx context.Context
+	writes := 0
+	client := setupCasbinInitialization(t, func(ctx context.Context, stage string) error {
+		if stage == "policy" && policyCtx == nil {
+			policyCtx = ctx
+		}
+		if stage == "write" {
+			writes++
+		}
+		return ctx.Err()
+	})
+	originalContext := client.Statement.Context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := InitCasbinEnforcer(ctx); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	if policyCtx == nil || !errors.Is(policyCtx.Err(), context.Canceled) {
+		t.Fatal("startup policy load did not use the canceled initialization context")
+	}
+	if client.Statement.Context != originalContext || originalContext.Err() != nil {
+		t.Fatal("initialization changed the shared MySQL context")
+	}
+	if added, err := resource.Enforcer.AddPolicy("admin", "/audit", "GET"); err != nil || !added {
+		t.Fatalf("runtime AutoSave failed: added=%v, err=%v", added, err)
+	}
+	if writes != 1 {
+		t.Fatalf("runtime AutoSave issued %d writes, want 1", writes)
+	}
+	if err := resource.Enforcer.LoadPolicy(); err != nil {
+		t.Fatalf("runtime policy reload failed: %v", err)
 	}
 }

@@ -6,12 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/casbin/casbin/v2"
-	"github.com/casbin/casbin/v2/model"
-	"github.com/gin-gonic/gin"
 	"github.com/xiebingnote/go-gin-project/library/config"
 	"github.com/xiebingnote/go-gin-project/library/middleware"
 	"github.com/xiebingnote/go-gin-project/library/resource"
+
+	"github.com/casbin/casbin/v2"
+	"github.com/casbin/casbin/v2/model"
+	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
 
@@ -388,6 +389,55 @@ func TestServerConstructorsOwnIndependentCircuitBreakers(t *testing.T) {
 			if rec := serveRequest(second, "GET", protectedPath+"/list", "", ""); rec.Code != 500 {
 				t.Fatalf("second instance inherited an open circuit: status=%d", rec.Code)
 			}
+		})
+	}
+}
+
+func TestServerOnlyAcceptsForwardedIPFromConfiguredProxies(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		proxies []string
+		peer    string
+		wantIP  string
+	}{
+		{"nil list", nil, "198.51.100.7:1234", "198.51.100.7"},
+		{"empty list", []string{}, "198.51.100.7:1234", "198.51.100.7"},
+		{"untrusted peer", []string{"127.0.0.1"}, "198.51.100.7:1234", "198.51.100.7"},
+		{"trusted address", []string{"127.0.0.1"}, "127.0.0.1:1234", "203.0.113.99"},
+		{"trusted subnet", []string{"192.0.2.0/24"}, "192.0.2.5:1234", "203.0.113.99"},
+		{"untrusted IPv6", nil, "[2001:db8::1]:1234", "2001:db8::1"},
+		{"trusted IPv6", []string{"::1"}, "[::1]:1234", "203.0.113.99"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := isolatedServerOptions(t)
+			opts.EnableAuth = false
+			opts.TrustedProxies = tt.proxies
+			router := NewServerWithOptions(opts)
+			router.GET("/client-ip", func(c *gin.Context) { c.String(200, c.ClientIP()) })
+			req := httptest.NewRequest("GET", "/client-ip", nil)
+			req.RemoteAddr = tt.peer
+			req.Header.Set("X-Forwarded-For", "203.0.113.99")
+			req.Header.Set("X-Real-IP", "203.0.113.99")
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+			if got := rec.Body.String(); got != tt.wantIP {
+				t.Fatalf("ClientIP=%s, want %s", got, tt.wantIP)
+			}
+		})
+	}
+}
+
+func TestServerRejectsInvalidTrustedProxies(t *testing.T) {
+	for _, proxies := range [][]string{{"not-an-ip"}, {"127.0.0.1/33"}, {"127.0.0.1", "invalid"}} {
+		t.Run(proxies[len(proxies)-1], func(t *testing.T) {
+			opts := isolatedServerOptions(t)
+			opts.TrustedProxies = proxies
+			defer func() {
+				if recover() == nil {
+					t.Fatal("server accepted invalid proxy configuration")
+				}
+			}()
+			NewServerWithOptions(opts)
 		})
 	}
 }

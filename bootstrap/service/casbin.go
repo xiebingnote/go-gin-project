@@ -10,6 +10,7 @@ import (
 
 	"github.com/casbin/casbin/v2"
 	gormadapter "github.com/casbin/gorm-adapter/v3"
+	"gorm.io/gorm"
 )
 
 // InitEnforcer initializes the Casbin enforcer.
@@ -30,7 +31,9 @@ import (
 func InitEnforcer(ctx context.Context) {
 	if err := InitCasbinEnforcer(ctx); err != nil {
 		// Log the error before panicking
-		resource.LoggerService.Error(fmt.Sprintf("failed to initialize casbin enforcer: %v", err))
+		if resource.LoggerService != nil {
+			resource.LoggerService.Error(fmt.Sprintf("failed to initialize casbin enforcer: %v", err))
+		}
 		panic(fmt.Sprintf("casbin enforcer initialization failed: %v", err))
 	}
 }
@@ -50,19 +53,23 @@ func InitEnforcer(ctx context.Context) {
 // 4. Performs functionality tests
 // 5. Stores the enforcer in global resource
 func InitCasbinEnforcer(ctx context.Context) error {
+	initCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	// Validate dependencies and configuration
-	if err := validateCasbinDependencies(); err != nil {
+	if err := validateCasbinDependencies(initCtx); err != nil {
 		return fmt.Errorf("casbin dependencies validation failed: %w", err)
 	}
 
 	resource.LoggerService.Info("initializing casbin enforcer")
 
-	// Create timeout context for initialization
-	initCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
+	// The adapter retains its DB. Give startup its own context-bound session;
+	// all database work must finish before initialization can return to cleanup.
+	client := resource.MySQLClient
+	adapterDB := client.WithContext(initCtx)
 
 	// Create a Gorm adapter with the MySQL client
-	adapter, err := createCasbinAdapter(initCtx)
+	adapter, err := createCasbinAdapter(initCtx, adapterDB)
 	if err != nil {
 		return fmt.Errorf("failed to create casbin adapter: %w", err)
 	}
@@ -78,6 +85,15 @@ func InitCasbinEnforcer(ctx context.Context) error {
 		return fmt.Errorf("casbin enforcer validation failed: %w", err)
 	}
 
+	if err := initCtx.Err(); err != nil {
+		return err
+	}
+
+	// WithContext cloned the Statement. Restore only this private session before
+	// publishing the adapter, so canceling initCtx does not break runtime AutoSave
+	// or policy reloads, and the shared MySQL client's context remains unchanged.
+	adapterDB.Statement.Context = client.Statement.Context
+
 	// Store the enforcer in the resource package
 	resource.Enforcer = enforcer
 
@@ -89,7 +105,10 @@ func InitCasbinEnforcer(ctx context.Context) error {
 //
 // Returns:
 //   - error: An error if any dependency is missing or invalid, nil otherwise
-func validateCasbinDependencies() error {
+func validateCasbinDependencies(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	// Check if MySQL client is initialized
 	if resource.MySQLClient == nil {
 		return fmt.Errorf("mysql client is not initialized")
@@ -112,7 +131,7 @@ func validateCasbinDependencies() error {
 		return fmt.Errorf("failed to get mysql database instance: %w", err)
 	}
 
-	if err := sqlDB.Ping(); err != nil {
+	if err := sqlDB.PingContext(ctx); err != nil {
 		return fmt.Errorf("mysql connection test failed: %w", err)
 	}
 
@@ -137,33 +156,23 @@ func getCasbinConfigPath() string {
 //
 // Parameters:
 //   - ctx: Context for the operation
+//   - db: Private DB session bound to ctx for initialization
 //
 // Returns:
 //   - *gormadapter.Adapter: The created adapter
 //   - error: An error if adapter creation fails, nil otherwise
-func createCasbinAdapter(ctx context.Context) (*gormadapter.Adapter, error) {
+func createCasbinAdapter(ctx context.Context, db *gorm.DB) (*gormadapter.Adapter, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	resource.LoggerService.Info("creating casbin gorm adapter")
 
-	// Create adapter with timeout
-	done := make(chan struct{})
-	var adapter *gormadapter.Adapter
-	var err error
-
-	go func() {
-		defer close(done)
-		adapter, err = gormadapter.NewAdapterByDB(resource.MySQLClient)
-	}()
-
-	// Wait for adapter creation or timeout
-	select {
-	case <-done:
-		if err != nil {
-			resource.LoggerService.Error(fmt.Sprintf("failed to create casbin adapter: %v", err))
-			return nil, err
-		}
-	case <-ctx.Done():
-		resource.LoggerService.Error("casbin adapter creation timeout")
-		return nil, fmt.Errorf("adapter creation timeout")
+	adapter, err := gormadapter.NewAdapterByDB(db)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return nil, ctxErr
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	resource.LoggerService.Info("successfully created casbin gorm adapter")
@@ -180,39 +189,24 @@ func createCasbinAdapter(ctx context.Context) (*gormadapter.Adapter, error) {
 //   - *casbin.Enforcer: The created enforcer
 //   - error: An error if enforcer creation fails, nil otherwise
 func createCasbinEnforcer(ctx context.Context, adapter *gormadapter.Adapter) (*casbin.Enforcer, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	configPath := getCasbinConfigPath()
 	resource.LoggerService.Info(fmt.Sprintf("creating casbin enforcer with config: %s", configPath))
 
-	// Create enforcer with timeout
-	done := make(chan struct{})
-	var enforcer *casbin.Enforcer
-	var err error
-
-	go func() {
-		defer close(done)
-		enforcer, err = casbin.NewEnforcer(configPath, adapter)
-	}()
-
-	// Wait for enforcer creation or timeout
-	select {
-	case <-done:
-		if err != nil {
-			resource.LoggerService.Error(fmt.Sprintf("failed to create casbin enforcer: %v", err))
-			return nil, err
-		}
-	case <-ctx.Done():
-		resource.LoggerService.Error("casbin enforcer creation timeout")
-		return nil, fmt.Errorf("enforcer creation timeout")
+	// NewEnforcer loads policies using the adapter's startup context. Running it
+	// synchronously prevents database cleanup racing a detached policy load.
+	enforcer, err := casbin.NewEnforcer(configPath, adapter)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return nil, ctxErr
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	// Enable auto-save for policy changes
 	enforcer.EnableAutoSave(true)
-
-	// Load policy from database
-	if err := enforcer.LoadPolicy(); err != nil {
-		resource.LoggerService.Error(fmt.Sprintf("failed to load casbin policy: %v", err))
-		return nil, fmt.Errorf("failed to load policy: %w", err)
-	}
 
 	resource.LoggerService.Info("successfully created casbin enforcer")
 	return enforcer, nil

@@ -91,13 +91,12 @@ func NewServerWithOptions(opts *ServerOptions) *gin.Engine {
 	// Create a new Gin engine without default middleware
 	router := gin.New()
 
-	// Configure trusted proxies
-	if len(opts.TrustedProxies) > 0 {
-		if err := router.SetTrustedProxies(opts.TrustedProxies); err != nil {
-			if resource.LoggerService != nil {
-				resource.LoggerService.Error("Failed to set trusted proxies", zap.Error(err))
-			}
+	// An empty list must explicitly disable Gin's default trust of all proxies.
+	if err := router.SetTrustedProxies(opts.TrustedProxies); err != nil {
+		if resource.LoggerService != nil {
+			resource.LoggerService.Error("Failed to set trusted proxies", zap.Error(err))
 		}
+		panic(fmt.Errorf("invalid trusted proxies: %w", err))
 	}
 
 	// Add base middleware

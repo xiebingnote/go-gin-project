@@ -8,8 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/xiebingnote/go-gin-project/pkg/circuitbreaker"
+
+	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
 

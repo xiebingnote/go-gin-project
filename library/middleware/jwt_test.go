@@ -175,3 +175,49 @@ func TestCasbinAuthorizationAllowsOnlyMatchingPolicy(t *testing.T) {
 		}
 	}
 }
+
+func TestJWTBoundsUntrustedInput(t *testing.T) {
+	configureTestJWT(t)
+	gin.SetMode(gin.TestMode)
+	signed := func(padding int) string {
+		return signTestClaims(t, jwt.MapClaims{
+			"user_id": 42, "role": "user", "exp": time.Now().Add(time.Hour).Unix(),
+			"padding": strings.Repeat("x", padding),
+		}, jwt.SigningMethodHS256, testJWTSecret)
+	}
+	for _, tt := range []struct {
+		name, raw string
+		wantValid bool
+	}{
+		{"valid bounded token", signed(MaxJWTTokenSize / 2), true},
+		{"oversized signed token", signed(MaxJWTTokenSize), false},
+		{"many segments", strings.Repeat(".", MaxJWTTokenSize), false},
+		{"oversized malformed token", strings.Repeat(".", 128<<10), false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseToken(tt.raw)
+			if (err == nil) != tt.wantValid {
+				t.Fatalf("ParseToken error=%v, want valid=%v", err, tt.wantValid)
+			}
+			for _, auth := range []gin.HandlerFunc{AuthMiddlewareJWT, AuthMiddlewareCasbin()} {
+				router := gin.New()
+				router.GET("/private", auth, func(c *gin.Context) { c.Status(http.StatusNoContent) })
+				req := httptest.NewRequest(http.MethodGet, "/private", nil)
+				req.Header.Set("Authorization", "Bearer "+tt.raw)
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+				want := http.StatusUnauthorized
+				if tt.wantValid {
+					want = http.StatusNoContent
+				}
+				if rec.Code != want {
+					t.Fatalf("HTTP status=%d, want %d", rec.Code, want)
+				}
+			}
+		})
+	}
+	// Excess whitespace must not bypass the size limit before Fields allocates.
+	if _, err := bearerToken("Bearer" + strings.Repeat(" ", MaxJWTTokenSize) + signed(0)); err == nil {
+		t.Fatal("oversized Authorization header accepted")
+	}
+}

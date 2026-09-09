@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/xiebingnote/go-gin-project/bootstrap/service"
@@ -62,5 +63,46 @@ func TestConsumerGroup_Success(t *testing.T) {
 	} else {
 		// Log a success message if the consumer starts successfully
 		fmt.Println("Message consumer successfully.")
+	}
+}
+
+// Run without the legacy broker-dependent test init functions:
+// go test -race consumer_group.go consumer_group_regression_test.go
+func TestConsumerGroupReadinessSurvivesRebalances(t *testing.T) {
+	ready := make(chan bool)
+	handler := &ExampleConsumerGroupHandler{Ready: ready}
+	for session := 0; session < 3; session++ {
+		if err := handler.Setup(nil); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case <-ready:
+		default:
+			t.Fatalf("session %d did not signal readiness", session)
+		}
+		if err := handler.Cleanup(nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestConsumerGroupConcurrentSetup(t *testing.T) {
+	handler := &ExampleConsumerGroupHandler{Ready: make(chan bool)}
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := handler.Setup(nil); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func TestConsumerGroupSetupRequiresReadyChannel(t *testing.T) {
+	if err := (&ExampleConsumerGroupHandler{}).Setup(nil); err == nil {
+		t.Fatal("uninitialized readiness channel accepted")
 	}
 }
