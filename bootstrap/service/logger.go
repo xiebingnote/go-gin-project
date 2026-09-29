@@ -219,7 +219,7 @@ func createLoggerInstance(ctx context.Context) (*zap.Logger, error) {
 	return loggerInstance, nil
 }
 
-// CloseLogger closes the logger service and flushes any pending log entries.
+// CloseLogger flushes the logger and closes its owned rolling log files.
 //
 // Parameters:
 //   - ctx: Context for the operation, used for timeouts and cancellation
@@ -229,23 +229,23 @@ func createLoggerInstance(ctx context.Context) (*zap.Logger, error) {
 //
 // The function performs the following operations:
 // 1. Checks if the logger is initialized
-// 2. Flushes any pending log entries
+// 2. Flushes pending entries and closes owned files
 // 3. Clears the global resource reference
 func CloseLogger(ctx context.Context) error {
-	logger := resource.LoggerService
-	if logger == nil {
+	logInstance := resource.LoggerService
+	if logInstance == nil {
 		return nil
 	}
 	closeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	err := waitForClose(closeCtx, func() error {
-		if err := logger.Sync(); err != nil && !isSyncErrorIgnorable(err) {
+		if err := logger.Close(logInstance); err != nil && !isSyncErrorIgnorable(err) {
 			return err
 		}
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("flush logger during shutdown: %w", err)
+		return fmt.Errorf("close logger during shutdown: %w", err)
 	}
 	resource.LoggerService = nil
 	return nil
@@ -307,6 +307,25 @@ func IsLoggerInitialized() bool {
 func isSyncErrorIgnorable(err error) bool {
 	if err == nil {
 		return false
+	}
+	// A harmless console error must never hide an accompanying file failure.
+	if group, ok := err.(interface{ Unwrap() []error }); ok {
+		causes := group.Unwrap()
+		if len(causes) == 0 {
+			return false
+		}
+		for _, cause := range causes {
+			if !isSyncErrorIgnorable(cause) {
+				return false
+			}
+		}
+		return true
+	}
+	// Keep PathError's stream name for the legacy console checks below.
+	if _, isPathError := err.(*os.PathError); !isPathError {
+		if wrapped, ok := err.(interface{ Unwrap() error }); ok {
+			return isSyncErrorIgnorable(wrapped.Unwrap())
+		}
 	}
 
 	errStr := err.Error()

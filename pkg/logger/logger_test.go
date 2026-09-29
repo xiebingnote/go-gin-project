@@ -1,16 +1,26 @@
 package logger
 
 import (
+	"encoding/json"
+	"errors"
+	"go.uber.org/zap"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/xiebingnote/go-gin-project/library/config"
 	"go.uber.org/zap/zapcore"
 )
 
 // setupTestConfig initializes test configuration
-func setupTestConfig() {
+func setupTestConfig(t *testing.T) {
+	t.Helper()
+	previous := config.LogConfig
+	t.Cleanup(func() { config.LogConfig = previous })
 	config.LogConfig = &config.LogConfigEntry{
 		Log: struct {
 			DefaultLevel string `toml:"DefaultLevel"`
@@ -26,7 +36,7 @@ func setupTestConfig() {
 			Compress     bool   `toml:"Compress"`
 		}{
 			DefaultLevel: "info",
-			LogDir:       "./test_logs",
+			LogDir:       t.TempDir(),
 			LogFileDebug: "debug.log",
 			LogFileInfo:  "info.log",
 			LogFileWarn:  "warn.log",
@@ -40,21 +50,13 @@ func setupTestConfig() {
 	}
 }
 
-// cleanupTestLogs removes test log directory
-func cleanupTestLogs() {
-	if config.LogConfig != nil {
-		os.RemoveAll(config.LogConfig.Log.LogDir)
-	}
-}
-
 // TestNewJsonLogger tests the NewJsonLogger function with various options.
 //
 // It checks that NewJsonLogger returns a valid logger when given valid options,
 // and that it returns an error when given invalid options. It also checks that
 // the logger can write logs and that it can be closed without error.
 func TestNewJsonLogger(t *testing.T) {
-	setupTestConfig()
-	defer cleanupTestLogs()
+	setupTestConfig(t)
 
 	tests := []struct {
 		name    string
@@ -108,7 +110,7 @@ func TestNewJsonLogger(t *testing.T) {
 				logger.Info("test log message")
 				// Close logger
 				if err := Close(logger); err != nil {
-					t.Logf("Warning: failed to close logger: %v", err)
+					t.Errorf("failed to close logger: %v", err)
 				}
 			}
 		})
@@ -146,7 +148,7 @@ func TestNewJsonLogger_ErrorCases(t *testing.T) {
 		{
 			name: "empty log directory",
 			setupFunc: func() {
-				setupTestConfig()
+				setupTestConfig(t)
 				config.LogConfig.Log.LogDir = ""
 			},
 			wantErr: true,
@@ -157,7 +159,6 @@ func TestNewJsonLogger_ErrorCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setupFunc()
-			defer cleanupTestLogs()
 
 			logger, err := NewJsonLogger()
 			if !tt.wantErr {
@@ -194,7 +195,7 @@ func TestGetDefaultLevel(t *testing.T) {
 		{
 			name: "debug level",
 			setup: func() {
-				setupTestConfig()
+				setupTestConfig(t)
 				config.LogConfig.Log.DefaultLevel = "debug"
 			},
 			expected: zapcore.DebugLevel,
@@ -202,7 +203,7 @@ func TestGetDefaultLevel(t *testing.T) {
 		{
 			name: "info level",
 			setup: func() {
-				setupTestConfig()
+				setupTestConfig(t)
 				config.LogConfig.Log.DefaultLevel = "info"
 			},
 			expected: zapcore.InfoLevel,
@@ -210,7 +211,7 @@ func TestGetDefaultLevel(t *testing.T) {
 		{
 			name: "warn level",
 			setup: func() {
-				setupTestConfig()
+				setupTestConfig(t)
 				config.LogConfig.Log.DefaultLevel = "warn"
 			},
 			expected: zapcore.WarnLevel,
@@ -218,7 +219,7 @@ func TestGetDefaultLevel(t *testing.T) {
 		{
 			name: "error level",
 			setup: func() {
-				setupTestConfig()
+				setupTestConfig(t)
 				config.LogConfig.Log.DefaultLevel = "error"
 			},
 			expected: zapcore.ErrorLevel,
@@ -226,7 +227,7 @@ func TestGetDefaultLevel(t *testing.T) {
 		{
 			name: "invalid level",
 			setup: func() {
-				setupTestConfig()
+				setupTestConfig(t)
 				config.LogConfig.Log.DefaultLevel = "invalid"
 			},
 			expected: zapcore.InfoLevel,
@@ -284,8 +285,7 @@ func TestValidateLogLevel(t *testing.T) {
 // The test cases include a valid filename and an empty filename. It checks
 // that the function returns the correct error for each test case.
 func TestCreateLogWriter(t *testing.T) {
-	setupTestConfig()
-	defer cleanupTestLogs()
+	setupTestConfig(t)
 
 	tests := []struct {
 		name     string
@@ -294,7 +294,7 @@ func TestCreateLogWriter(t *testing.T) {
 	}{
 		{
 			name:     "valid filename",
-			filename: filepath.Join("./test_logs", "test.log"),
+			filename: filepath.Join(config.LogConfig.Log.LogDir, "test.log"),
 			wantErr:  false,
 		},
 		{
@@ -306,13 +306,18 @@ func TestCreateLogWriter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			writer, err := createLogWriter(tt.filename)
+			writer, err := createLogWriter(tt.filename, config.LogConfig)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("createLogWriter() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && writer == nil {
 				t.Errorf("createLogWriter() returned nil writer")
+			}
+			if writer != nil {
+				if err := writer.Close(); err != nil {
+					t.Fatal(err)
+				}
 			}
 		})
 	}
@@ -332,8 +337,7 @@ func TestClose(t *testing.T) {
 	}
 
 	// Test with valid logger
-	setupTestConfig()
-	defer cleanupTestLogs()
+	setupTestConfig(t)
 
 	logger, err := NewJsonLogger(WithDisableConsole())
 	if err != nil {
@@ -342,6 +346,334 @@ func TestClose(t *testing.T) {
 
 	err = Close(logger)
 	if err != nil {
-		t.Logf("Warning: Close() returned error: %v", err)
+		t.Errorf("Close() returned error: %v", err)
+	}
+}
+
+func readEntries(t *testing.T, path string) []map[string]any {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entries []map[string]any
+	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	for {
+		var entry map[string]any
+		if err := decoder.Decode(&entry); errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			t.Fatalf("invalid JSON log in %s: %v", path, err)
+		}
+		entries = append(entries, entry)
+	}
+	return entries
+}
+
+func TestFileRoutingHonorsMinimumLevel(t *testing.T) {
+	for minimum := zapcore.DebugLevel; minimum <= zapcore.FatalLevel; minimum++ {
+		t.Run(minimum.String(), func(t *testing.T) {
+			setupTestConfig(t)
+			log, err := NewJsonLogger(WithLevel(minimum), WithDisableConsole())
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = Close(log) })
+			// Check the core directly to exercise Panic/Fatal routing without exiting.
+			for level := zapcore.DebugLevel; level <= zapcore.FatalLevel; level++ {
+				if entry := log.Core().Check(zapcore.Entry{Level: level, Message: level.String(), Time: time.Now()}, nil); entry != nil {
+					entry.Write()
+				}
+			}
+			if err := Close(log); err != nil {
+				t.Fatal(err)
+			}
+			for _, file := range []struct {
+				name     string
+				min, max zapcore.Level
+			}{{"debug.log", zapcore.DebugLevel, zapcore.DebugLevel}, {"info.log", zapcore.InfoLevel, zapcore.InfoLevel},
+				{"warn.log", zapcore.WarnLevel, zapcore.WarnLevel}, {"error.log", zapcore.ErrorLevel, zapcore.FatalLevel}} {
+				entries := readEntries(t, filepath.Join(config.LogConfig.Log.LogDir, file.name))
+				want := 0
+				for level := file.min; level <= file.max; level++ {
+					if level >= minimum {
+						want++
+					}
+				}
+				if len(entries) != want {
+					t.Fatalf("%s has %d entries, want %d", file.name, len(entries), want)
+				}
+				for _, entry := range entries {
+					level, err := zapcore.ParseLevel(entry["level"].(string))
+					if err != nil || level < minimum || level < file.min || level > file.max {
+						t.Fatalf("wrong destination for %v: %s", entry, file.name)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestConsoleRoutingIncludesWarnAndHonorsThreshold(t *testing.T) {
+	for _, minimum := range []zapcore.Level{zapcore.InfoLevel, zapcore.ErrorLevel} {
+		t.Run(minimum.String(), func(t *testing.T) {
+			setupTestConfig(t)
+			previousOut, previousErr := os.Stdout, os.Stderr
+			out, err := os.CreateTemp(t.TempDir(), "stdout")
+			if err != nil {
+				t.Fatal(err)
+			}
+			errOut, err := os.CreateTemp(t.TempDir(), "stderr")
+			if err != nil {
+				_ = out.Close()
+				t.Fatal(err)
+			}
+			os.Stdout, os.Stderr = out, errOut
+			t.Cleanup(func() {
+				os.Stdout, os.Stderr = previousOut, previousErr
+				_ = out.Close()
+				_ = errOut.Close()
+			})
+			log, err := NewJsonLogger(WithLevel(minimum))
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = Close(log) })
+			log.Debug("debug")
+			log.Info("info")
+			log.Warn("warn")
+			log.Error("error")
+			if err := Close(log); err != nil {
+				t.Fatal(err)
+			}
+			stdout, stderr := readEntries(t, out.Name()), readEntries(t, errOut.Name())
+			if minimum == zapcore.InfoLevel {
+				if len(stdout) != 1 || stdout[0]["level"] != "info" || len(stderr) != 2 || stderr[0]["level"] != "warn" || stderr[1]["level"] != "error" {
+					t.Fatalf("incorrect console routing: stdout=%v stderr=%v", stdout, stderr)
+				}
+			} else if len(stdout) != 0 || len(stderr) != 1 || stderr[0]["level"] != "error" {
+				t.Fatalf("console ignored minimum level: stdout=%v stderr=%v", stdout, stderr)
+			}
+			if _, err := out.WriteString("still open"); err != nil {
+				t.Fatalf("Close closed stdout: %v", err)
+			}
+			if _, err := errOut.WriteString("still open"); err != nil {
+				t.Fatalf("Close closed stderr: %v", err)
+			}
+		})
+	}
+}
+
+func TestConsoleSyncHandlesPipesButReportsClosedFiles(t *testing.T) {
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = reader.Close(); _ = writer.Close() })
+	console := consoleWriter{writer}
+	if err := console.Sync(); err != nil {
+		t.Fatalf("pipe Sync should be harmless: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := console.Sync(); !errors.Is(err, os.ErrClosed) {
+		t.Fatalf("lost closed-file error: %v", err)
+	}
+	if isValidFileDescriptor(nil) || isValidFileDescriptor(writer) {
+		t.Fatal("invalid console descriptor accepted")
+	}
+}
+
+func TestLoggerRejectsInvalidConfiguration(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		edit func()
+		opts []Option
+	}{
+		{"invalid default level", func() { config.LogConfig.Log.DefaultLevel = "verbose" }, nil},
+		{"empty filename", func() { config.LogConfig.Log.LogFileInfo = "" }, nil},
+		{"directory filename", func() { config.LogConfig.Log.LogFileInfo = "." }, nil},
+		{"parent traversal", func() { config.LogConfig.Log.LogFileInfo = "../outside.log" }, nil},
+		{"absolute filename", func() { config.LogConfig.Log.LogFileInfo = filepath.Join(t.TempDir(), "outside.log") }, nil},
+		{"duplicate filename", func() { config.LogConfig.Log.LogFileInfo = "./debug.log" }, nil},
+		{"negative size", func() { config.LogConfig.Log.MaxSize = -1 }, nil},
+		{"negative backups", func() { config.LogConfig.Log.MaxBackups = -1 }, nil},
+		{"negative retention", func() { config.LogConfig.Log.MaxAge = -1 }, nil},
+		{"nil option", nil, []Option{nil}},
+		{"invalid level option", nil, []Option{WithLevel(zapcore.Level(100))}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			setupTestConfig(t)
+			if tt.edit != nil {
+				tt.edit()
+			}
+			log, err := NewJsonLogger(tt.opts...)
+			if err == nil || log != nil {
+				_ = Close(log)
+				t.Fatal("invalid configuration accepted")
+			}
+		})
+	}
+}
+
+func TestLoggerRejectsUnusableDestinationsWithoutTruncatingFiles(t *testing.T) {
+	for _, kind := range []string{"directory", "symlink", "hardlink"} {
+		t.Run(kind, func(t *testing.T) {
+			setupTestConfig(t)
+			dir := config.LogConfig.Log.LogDir
+			original := filepath.Join(dir, "info.log")
+			if err := os.WriteFile(original, []byte("existing log\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			blocked := filepath.Join(dir, "error.log")
+			var err error
+			switch kind {
+			case "directory":
+				err = os.Mkdir(blocked, 0700)
+			case "symlink":
+				err = os.Symlink(original, blocked)
+			case "hardlink":
+				err = os.Link(original, blocked)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			log, err := NewJsonLogger(WithDisableConsole())
+			if err == nil || log != nil {
+				_ = Close(log)
+				t.Fatal("invalid log destination accepted")
+			}
+			data, err := os.ReadFile(original)
+			if err != nil || string(data) != "existing log\n" {
+				t.Fatalf("existing log changed: %q, %v", data, err)
+			}
+		})
+	}
+}
+
+func TestLoggerFieldsAreSnapshottedAndCloseCoversChildren(t *testing.T) {
+	setupTestConfig(t)
+	fields := map[string]string{"service": "original", "version": "1"}
+	option := WithFields(fields)
+	fields["service"] = "changed"
+	log, err := NewJsonLogger(option, WithField("version", "2"), WithTimeLayout("2006"), WithDisableConsole())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = Close(log) })
+	child := log.Named("child").With(zap.String("request", "42"))
+	child.Info("before sync")
+	if err := child.Sync(); err != nil {
+		t.Fatal(err)
+	}
+	child.Info("after sync")
+	if err := Close(child); err != nil {
+		t.Fatal(err)
+	}
+	if err := Close(log); err != nil {
+		t.Fatal(err)
+	}
+	// A saved reference must not reopen a file after its family is closed.
+	log.WithOptions(zap.ErrorOutput(zapcore.AddSync(io.Discard))).Info("after close")
+	entries := readEntries(t, filepath.Join(config.LogConfig.Log.LogDir, "info.log"))
+	if len(entries) != 2 {
+		t.Fatalf("expected exactly two entries before Close, got %v", entries)
+	}
+	for _, entry := range entries {
+		if entry["service"] != "original" || entry["version"] != "2" || entry["request"] != "42" || entry["logger"] != "child" || entry["time"] != time.Now().Format("2006") {
+			t.Fatalf("incorrect structured log: %v", entry)
+		}
+	}
+}
+
+func TestLoggerConcurrentWritesAndClose(t *testing.T) {
+	setupTestConfig(t)
+	log, err := NewJsonLogger(WithDisableConsole())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = Close(log) })
+	var wg sync.WaitGroup
+	for worker := 0; worker < 8; worker++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			child := log.With(zap.Int("worker", id))
+			for i := 0; i < 50; i++ {
+				child.Info("concurrent log", zap.Int("item", i))
+			}
+		}(worker)
+	}
+	wg.Wait()
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := Close(log.With(zap.Bool("closing", true))); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+	if got := len(readEntries(t, filepath.Join(config.LogConfig.Log.LogDir, "info.log"))); got != 400 {
+		t.Fatalf("concurrent writes lost or corrupted logs: got %d, want 400", got)
+	}
+}
+
+type failingLogSink struct {
+	syncErr, closeErr error
+	closes            int
+}
+
+func (*failingLogSink) Write(p []byte) (int, error) { return len(p), nil }
+func (s *failingLogSink) Sync() error               { return s.syncErr }
+func (s *failingLogSink) Close() error              { s.closes++; return s.closeErr }
+
+func TestClosePreservesSyncAndCloseErrors(t *testing.T) {
+	syncErr, closeErr := errors.New("sync failed"), errors.New("close failed")
+	first := &failingLogSink{syncErr: syncErr, closeErr: closeErr}
+	second := &failingLogSink{}
+	files := []*logWriter{{writer: first}, {writer: second}}
+	core := &managedCore{
+		Core:      zapcore.NewCore(zapcore.NewJSONEncoder(createEncoderConfig(time.RFC3339)), files[0], zapcore.DebugLevel),
+		resources: &logResources{files: files},
+	}
+	log := zap.New(core)
+	for i := 0; i < 2; i++ {
+		err := Close(log)
+		if !errors.Is(err, syncErr) || !errors.Is(err, closeErr) {
+			t.Fatalf("lost cleanup errors: %v", err)
+		}
+	}
+	if first.closes != 1 || second.closes != 1 {
+		t.Fatalf("cleanup must close every sink exactly once: %d, %d", first.closes, second.closes)
+	}
+	if _, err := files[0].Write([]byte("late log")); !errors.Is(err, os.ErrClosed) {
+		t.Fatalf("closed writer accepted a write: %v", err)
+	}
+}
+
+func TestLogRotationRetainsBothEntries(t *testing.T) {
+	setupTestConfig(t)
+	config.LogConfig.Log.MaxSize = 1
+	log, err := NewJsonLogger(WithDisableConsole())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = Close(log) })
+	log.Info("first", zap.String("payload", strings.Repeat("x", 600*1024)))
+	log.Info("second", zap.String("payload", strings.Repeat("y", 600*1024)))
+	if err := Close(log); err != nil {
+		t.Fatal(err)
+	}
+	dir := config.LogConfig.Log.LogDir
+	backups, err := filepath.Glob(filepath.Join(dir, "info-*.log"))
+	if err != nil || len(backups) != 1 {
+		t.Fatalf("expected one rotated file, got %v, %v", backups, err)
+	}
+	old, current := readEntries(t, backups[0]), readEntries(t, filepath.Join(dir, "info.log"))
+	if len(old) != 1 || old[0]["msg"] != "first" || len(current) != 1 || current[0]["msg"] != "second" {
+		t.Fatal("rotation lost or duplicated log entries")
 	}
 }

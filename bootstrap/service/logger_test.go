@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,8 +12,10 @@ import (
 
 	"github.com/xiebingnote/go-gin-project/library/config"
 	"github.com/xiebingnote/go-gin-project/library/resource"
+	logpkg "github.com/xiebingnote/go-gin-project/pkg/logger"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // setupTestLoggerConfig initializes a test configuration for Logger
@@ -394,5 +399,51 @@ func TestInitLogger_WithValidConfig(t *testing.T) {
 	// Clean up
 	if resource.LoggerService != nil {
 		_ = CloseLogger(ctx)
+	}
+}
+
+func TestLoggerCloseDoesNotIgnoreCombinedFileErrors(t *testing.T) {
+	console := errors.New("sync /dev/stderr: bad file descriptor")
+	file := errors.New("disk I/O failure")
+	for _, err := range []error{errors.Join(console, file), fmt.Errorf("shutdown: %w", errors.Join(console, file))} {
+		if isSyncErrorIgnorable(err) {
+			t.Fatalf("file failure was hidden: %v", err)
+		}
+	}
+	if !isSyncErrorIgnorable(errors.Join(console, fmt.Errorf("wrapped: %w", console))) {
+		t.Fatal("legacy console-only errors should remain ignorable")
+	}
+}
+
+func TestCloseLoggerReleasesOwnedFiles(t *testing.T) {
+	previousConfig, previousLogger := config.LogConfig, resource.LoggerService
+	t.Cleanup(func() { config.LogConfig, resource.LoggerService = previousConfig, previousLogger })
+	config.LogConfig = &config.LogConfigEntry{}
+	cfg := &config.LogConfig.Log
+	cfg.LogDir, cfg.DefaultLevel = t.TempDir(), "info"
+	cfg.LogFileDebug, cfg.LogFileInfo = "debug.log", "info.log"
+	cfg.LogFileWarn, cfg.LogFileError = "warn.log", "error.log"
+	log, err := logpkg.NewJsonLogger(logpkg.WithDisableConsole())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = logpkg.Close(log) })
+	resource.LoggerService = log
+	log.Info("before close")
+	path := filepath.Join(cfg.LogDir, cfg.LogFileInfo)
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := CloseLogger(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if resource.LoggerService != nil {
+		t.Fatal("logger service reference was not cleared")
+	}
+	log.WithOptions(zap.ErrorOutput(zapcore.AddSync(io.Discard))).Info("after close")
+	after, err := os.ReadFile(path)
+	if err != nil || string(before) != string(after) {
+		t.Fatalf("service shutdown left files writable: %v", err)
 	}
 }
